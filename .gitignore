@@ -1,0 +1,22 @@
+# Arduino IDE build artifacts
+build/
+*.bin
+*.elf
+*.hex
+*.map
+*.partitions.bin
+
+# Local secrets
+Battleship_ESP32/secrets.h
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
