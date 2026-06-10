@@ -138,15 +138,22 @@ static void on_assign(const proto::AssignMsg& m) {
 
 static void on_state(const proto::StateMsg& m) {
   g_state.turn = m.turn;
-  // Se non siamo ancora in Playing (es. WaitingGameStart dopo setup interno,
-  // o SettingUp se il Setup e' stato pubblicato esternamente via mosquitto_pub
-  // a scopo di test), il primo state che arriva implica "partita iniziata".
-  if (s_phase != AppPhase::Playing) {
-    s_phase = AppPhase::Playing;
-    Serial.printf("[fsm] game start! first turn=%s -> Playing\n",
-                  role_to_str(g_state.turn));
-  } else {
-    Serial.printf("[fsm] turn -> %s\n", role_to_str(g_state.turn));
+  switch (s_phase) {
+    case AppPhase::Playing:
+      // Normale aggiornamento del turno.
+      Serial.printf("[fsm] turn -> %s\n", role_to_str(g_state.turn));
+      break;
+    case AppPhase::End:
+      // Partita finita per la nostra deduzione, ma il server continua ad
+      // alternare i turni: ignoriamo i state successivi.
+      break;
+    default:
+      // Primo state dopo una fase pre-gioco (WaitingGameStart, SettingUp,
+      // Registering, WaitingNet, Init): la partita e' iniziata.
+      s_phase = AppPhase::Playing;
+      Serial.printf("[fsm] game start! first turn=%s -> Playing\n",
+                    role_to_str(g_state.turn));
+      break;
   }
 }
 
@@ -156,6 +163,20 @@ static void on_event(const proto::EventMsg& m) {
                 hitresult_to_str(m.hit),
                 m.x, m.y);
   game_state_apply_event(m);
+
+  // Deduzione game over dai contatori. Il server non manda un evento
+  // esplicito di fine partita: lo deduciamo noi quando una flotta intera
+  // viene affondata. Cosi' il renderer puo' leggere app_fsm_phase()==End
+  // per disegnare vittoria/sconfitta.
+  if (s_phase == AppPhase::Playing) {
+    if (g_state.enemy_ships_sunk >= FLEET_COUNT) {
+      s_phase = AppPhase::End;
+      Serial.println("[fsm] WIN! enemy fleet destroyed -> End");
+    } else if (g_state.my_ships_sunk >= FLEET_COUNT) {
+      s_phase = AppPhase::End;
+      Serial.println("[fsm] LOSS! own fleet destroyed -> End");
+    }
+  }
 }
 
 // ============================================================================
