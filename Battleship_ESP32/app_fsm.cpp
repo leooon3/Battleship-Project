@@ -18,7 +18,6 @@
 
 // ---- Stato FSM ----
 static AppPhase  s_phase       = AppPhase::Init;
-static uint32_t  s_last_log_ms = 0;
 
 // ---- Coda input lock-free (single producer single consumer) ----
 // Il team joystick puo' chiamare app_on_input() anche da ISR: scriviamo
@@ -77,22 +76,8 @@ void app_fsm_loop() {
     }
   }
 
-  // 2) Log heartbeat ogni 5s.
-  uint32_t now = millis();
-  if (now - s_last_log_ms > 5000) {
-    s_last_log_ms = now;
-    Serial.printf("[fsm] phase=%s wifi=%d mqtt=%d role=%s gid=%lu turn=%s "
-                  "cur=(%u,%u) setup=%u/%u sunkMe=%u sunkEnemy=%u\n",
-                  app_fsm_phase_str(),
-                  (int)net_wifi_is_connected(),
-                  (int)net_mqtt_is_connected(),
-                  role_to_str(g_state.my_role),
-                  (unsigned long)g_state.game_id,
-                  role_to_str(g_state.turn),
-                  g_state.cursor_x, g_state.cursor_y,
-                  g_state.setup_index, (unsigned)FLEET_COUNT,
-                  g_state.my_ships_sunk, g_state.enemy_ships_sunk);
-  }
+  // (Niente log periodico: tutto cio' che e' interessante e' gia' loggato
+  // event-driven sotto, sulle transizioni di fase e callback MQTT.)
 }
 
 AppPhase app_fsm_phase() { return s_phase; }
@@ -153,7 +138,10 @@ static void on_assign(const proto::AssignMsg& m) {
 
 static void on_state(const proto::StateMsg& m) {
   g_state.turn = m.turn;
-  if (s_phase == AppPhase::WaitingGameStart) {
+  // Se non siamo ancora in Playing (es. WaitingGameStart dopo setup interno,
+  // o SettingUp se il Setup e' stato pubblicato esternamente via mosquitto_pub
+  // a scopo di test), il primo state che arriva implica "partita iniziata".
+  if (s_phase != AppPhase::Playing) {
     s_phase = AppPhase::Playing;
     Serial.printf("[fsm] game start! first turn=%s -> Playing\n",
                   role_to_str(g_state.turn));

@@ -4,6 +4,7 @@
 #include "net_wifi.h"
 #include "game_config.h"
 #include <WiFi.h>
+#include <esp_mac.h>   // esp_read_mac() per leggere il MAC dagli eFuses
 
 static const char* s_ssid = nullptr;
 static const char* s_pass = nullptr;
@@ -19,22 +20,26 @@ void net_wifi_begin(const char* ssid, const char* pass) {
   WiFi.setAutoReconnect(true);
   WiFi.setSleep(false);   // disabilita sleep modem: piu' reattivo con MQTT
 
-  // Workaround DHCP del Pi: il dnsmasq dell'AP NetworkManager attualmente non
-  // assegna un IP. Usiamo IP statico nel range del Pi (192.168.4.0/24).
-  // .100, .101, ... per le diverse unita': differenziabili modificando il
-  // quarto ottetto qui sotto. Quando il DHCP del Pi sara' funzionante,
-  // commentare le 4 righe WiFi.config(...) per tornare a DHCP.
-  IPAddress local_ip(192, 168, 4, 150);
-  IPAddress gateway (192, 168, 4, 1);
-  IPAddress subnet  (255, 255, 255, 0);
-  IPAddress dns     (192, 168, 4, 1);
-  WiFi.config(local_ip, gateway, subnet, dns);
+  // Per il test sulla rete TIM di casa usiamo DHCP (il router assegna IP).
+  // Quando torneremo all'AP del Pi (che ha il dnsmasq rotto), riattivare le
+  // 4 righe sotto per forzare IP statico nel range 192.168.4.0/24.
+  // IPAddress local_ip(192, 168, 4, 150);
+  // IPAddress gateway (192, 168, 4, 1);
+  // IPAddress subnet  (255, 255, 255, 0);
+  // IPAddress dns     (192, 168, 4, 1);
+  // WiFi.config(local_ip, gateway, subnet, dns);
 
   // Memorizza il MAC nel formato canonico "AA:BB:CC:DD:EE:FF" (uppercase).
-  // WiFi.macAddress() lo restituisce gia' cosi'.
-  String mac = WiFi.macAddress();
-  strncpy(s_mac, mac.c_str(), sizeof(s_mac) - 1);
-  s_mac[sizeof(s_mac) - 1] = 0;
+  // NOTA: usiamo esp_read_mac() invece di WiFi.macAddress() perche' su
+  // alcune board/versioni del core arduino-esp32, WiFi.macAddress() chiamata
+  // prima di WiFi.begin() restituisce 00:00:00:00:00:00 (driver WiFi non
+  // ancora pronto). esp_read_mac() legge direttamente dagli eFuses, sempre
+  // affidabile, e ci da' il vero STA MAC del chip.
+  uint8_t mac_bytes[6] = {0};
+  esp_read_mac(mac_bytes, ESP_MAC_WIFI_STA);
+  snprintf(s_mac, sizeof(s_mac), "%02X:%02X:%02X:%02X:%02X:%02X",
+           mac_bytes[0], mac_bytes[1], mac_bytes[2],
+           mac_bytes[3], mac_bytes[4], mac_bytes[5]);
 
   Serial.printf("[wifi] MAC=%s, connecting to SSID=\"%s\"\n", s_mac, ssid);
   WiFi.begin(ssid, pass);

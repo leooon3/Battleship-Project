@@ -31,7 +31,6 @@
 #include "net_wifi.h"
 #include "net_mqtt.h"
 #include "app_fsm.h"
-#include "hello.h"
 
 void setup() {
   Serial.begin(115200);
@@ -62,10 +61,6 @@ void setup() {
   net_mqtt_begin(MQTT_HOST, MQTT_PORT, nullptr, nullptr, net_wifi_mac());
 #endif
 
-  // --- Hello (canale di debug del broker, indipendente dalla FSM) ---
-  hello_init(net_wifi_mac());
-  net_mqtt_set_on_raw(hello_on_raw_message);
-
   // --- FSM ---
   app_fsm_begin();
 
@@ -75,7 +70,6 @@ void setup() {
 void loop() {
   net_wifi_loop();
   net_mqtt_loop();
-  hello_loop();
   app_fsm_loop();
 
   // Cede CPU senza bloccare per troppo tempo.

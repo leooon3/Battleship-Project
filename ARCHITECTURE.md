@@ -90,7 +90,6 @@ Poi installare **esp32 by Espressif Systems**.
 |---|---|---|
 | `battleship/register` | dopo MQTT connect | `{"id":"AA:BB:CC:DD:EE:FF"}` |
 | `battleship/game/{gid}/{role}/action` | durante gioco | `{"Shoot":[x,y]}` o `{"Setup":[...]}` |
-| `battleship/hello/{MAC}/out` | ogni 5s (debug) | `{"mac":"...","msg":"hello","uptime_ms":N,"n":N}` |
 
 ### Topic — ESP32 sottoscrive
 
@@ -99,7 +98,6 @@ Poi installare **esp32 by Espressif Systems**.
 | `battleship/{MAC}/assign` | dopo register | `{"role":"host","game_id":0}` |
 | `battleship/game/{gid}/state` | dopo assign | `{"turn":"host"}` |
 | `battleship/game/{gid}/{role}/event` | dopo assign | `{"attacker":"host","hit":"Water","position":[x,y]}` |
-| `battleship/hello/{MAC}/in` | sempre (debug) | testo arbitrario, log su Serial |
 
 ### Convenzioni di serializzazione (dal codice Rust)
 
@@ -117,7 +115,7 @@ Poi installare **esp32 by Espressif Systems**.
 
 ```
        ┌────────┐
-       │  BOOT  │  init Serial, WiFi, MQTT, hello, FSM
+       │  BOOT  │  init Serial, WiFi, MQTT, FSM
        └───┬────┘
            ▼
    ┌────────────────┐
@@ -177,7 +175,6 @@ Tutti i file in `Battleship_ESP32/` (vincolo Arduino IDE: niente sub-folder).
 | `net_mqtt.h/.cpp` | wrapper espMqttClient: connect, sub, pub, dispatch verso callback |
 | `game_state.h/.cpp` | singleton `g_state`: board, cursore, wizard setup, contatori |
 | `app_fsm.h/.cpp` | FSM + handler input + callback MQTT |
-| `hello.h/.cpp` | canale di debug `battleship/hello/...` per testare il broker |
 | `hal.h` | interfaccia input dal team joystick (`app_on_input(InputEvent)`) |
 
 ---
@@ -239,25 +236,21 @@ commenta le 4 righe `WiFi.config(...)` in `net_wifi_begin()`.
 
 ---
 
-## 9. Debug col canale `hello`
+## 9. Debug col broker
 
-Indipendentemente dal server Rust, l'ESP32 pubblica e sottoscrive su:
-
-```
-battleship/hello/{MAC}/out    ← ESP32 pubblica ogni 5s
-battleship/hello/{MAC}/in     ← ESP32 sottoscrive
-```
-
-Sul Pi, per vedere il traffico:
+Per vedere tutto il traffico verso/dal broker (utile per debug del protocollo):
 ```bash
-mosquitto_sub -h 192.168.4.1 -t "battleship/#" -v
+mosquitto_sub -h <broker> -t "battleship/#" -v
 ```
 
-Per mandare un messaggio a una specifica ESP32:
-```bash
-mosquitto_pub -h 192.168.4.1 -t "battleship/hello/AA:BB:CC:DD:EE:FF/in" -m "ciao"
+Per pubblicare a mano un messaggio (es. simulare un Setup o uno Shoot senza
+joystick), evita il quoting hell di PowerShell: scrivi il JSON in un file e
+usa `mosquitto_pub -f file.json`. Esempio:
+```powershell
+$body = '{"Shoot":[1,1]}'
+Set-Content -Path shoot.json -Value $body -Encoding ASCII -NoNewline
+mosquitto_pub -h 127.0.0.1 -t "battleship/game/0/guest/action" -f shoot.json
 ```
-Vedi il messaggio comparire nel Serial Monitor di quella ESP32.
 
 ---
 
