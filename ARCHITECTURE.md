@@ -214,11 +214,27 @@ animazioni, pulsazioni cursore...).
 
 ## 8. Configurazione (`secrets.h`)
 
+Si definiscono **due reti in ordine di priorità**: all'avvio il firmware fa
+una scansione e si collega alla prima che è in onda (Pi se presente, altrimenti
+il fallback). Ogni rete porta il proprio broker, perché di solito differiscono
+(broker sul Pi vs broker sul PC di sviluppo).
+
 ```cpp
-#define WIFI_SSID  "dawspie"
-#define WIFI_PASS  "p4ssw0rd!"
-#define MQTT_HOST  "192.168.4.1"   // o "dawspie" se mDNS risolve
-#define MQTT_PORT  1883
+// Primaria: access point del Raspberry Pi (broker sul Pi).
+#define WIFI_PI_SSID  "dawspie"
+#define WIFI_PI_PASS  "p4ssw0rd!"
+#define WIFI_PI_MQTT  "192.168.4.1"
+#define WIFI_PI_IP    ""              // "" = DHCP; oppure "192.168.4.150" per IP statico
+#define WIFI_PI_GW    "192.168.4.1"
+
+// Fallback: WiFi di casa (broker sul PC di sviluppo).
+#define WIFI_FB_SSID  "FASTWEB-..."
+#define WIFI_FB_PASS  "..."
+#define WIFI_FB_MQTT  "192.168.1.51"
+#define WIFI_FB_IP    ""
+#define WIFI_FB_GW    ""
+
+#define MQTT_PORT 1883
 // se il broker richiede auth:
 // #define MQTT_USER  "..."
 // #define MQTT_PASS  "..."
@@ -226,12 +242,10 @@ animazioni, pulsazioni cursore...).
 
 `secrets.h` è in `.gitignore`. Versionato solo `secrets.example.h`.
 
-### IP statico (workaround DHCP Pi)
-
-Il DHCP server di NetworkManager sul Pi attualmente non assegna IP ai client.
-In `net_wifi.cpp` forziamo IP statico `192.168.4.150`. Cambia il quarto ottetto
-se più ESP32 girano sulla stessa rete. Quando il DHCP del Pi verrà fixato,
-commenta le 4 righe `WiFi.config(...)` in `net_wifi_begin()`.
+La selezione e il fallback vivono in `net_wifi.cpp`: scansione, scelta della
+rete visibile a priorità più alta, timeout di 8s per rete prima di passare
+alla successiva. Se una rete richiede IP statico (es. DHCP del Pi non
+funzionante) basta valorizzare `WIFI_PI_IP`/`WIFI_PI_GW`.
 
 ---
 

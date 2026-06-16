@@ -13,6 +13,5 @@ constexpr int BOARD_H = 8;
 constexpr int FLEET_LENS[] = { 2, 1, 1, 1 };
 constexpr int FLEET_COUNT  = sizeof(FLEET_LENS) / sizeof(FLEET_LENS[0]);
 
-constexpr uint32_t WIFI_RETRY_MS    = 2000;
 constexpr uint32_t MQTT_RETRY_MS    = 2000;
 constexpr uint16_t MQTT_KEEPALIVE_S = 15;
