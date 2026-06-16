@@ -121,10 +121,14 @@ Poi installare **esp32 by Espressif Systems**.
    ┌────────────────┐
    │ WAITINGNET     │   WiFi + MQTT non ancora connessi
    └───┬────────────┘
-       ▼
+       ▼ MQTT connesso: sub battleship/{MAC}/assign
    ┌────────────────┐
-   │  REGISTERING   │   sub battleship/{MAC}/assign
-   │                │   pub battleship/register {"id":MAC}
+   │     READY      │   schermata d'attesa (barchette)
+   │                │   il giocatore preme il pulsante per iniziare
+   └───┬────────────┘
+       ▼ BtnShort/BtnLong
+   ┌────────────────┐
+   │  REGISTERING   │   pub battleship/register {"id":MAC}
    └───┬────────────┘
        ▼ ricevuto assign(role, game_id)
        │ sub battleship/game/{gid}/state e .../{role}/event

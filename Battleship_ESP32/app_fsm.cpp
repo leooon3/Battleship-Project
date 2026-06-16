@@ -28,13 +28,21 @@ void app_on_input(InputEvent e) {
   s_tail = next;
 }
 
+static void handle_input_ready(InputEvent e);
 static void handle_input_setup(InputEvent e);
 static void handle_input_playing(InputEvent e);
 
 static void on_mqtt_connected() {
-  const char* mac = net_wifi_mac();
-  net_mqtt_subscribe_assign(mac);
-  net_mqtt_publish_register(mac);
+  // Subscribe to our reply topic now, but don't register yet: the display
+  // shows an idle "waiting" screen and we register only when the player
+  // presses the button (see handle_input_ready).
+  net_mqtt_subscribe_assign(net_wifi_mac());
+  s_phase = AppPhase::Ready;
+  Serial.println("[fsm] -> Ready (press button to start)");
+}
+
+static void start_registering() {
+  net_mqtt_publish_register(net_wifi_mac());
   s_phase = AppPhase::Registering;
   Serial.println("[fsm] -> Registering");
 }
@@ -94,8 +102,12 @@ void app_fsm_begin() {
 void app_fsm_loop() {
   InputEvent e;
   while (input_pop(e)) {
-    if (s_phase == AppPhase::SettingUp) handle_input_setup(e);
-    else if (s_phase == AppPhase::Playing) handle_input_playing(e);
+    switch (s_phase) {
+      case AppPhase::Ready:     handle_input_ready(e);   break;
+      case AppPhase::SettingUp: handle_input_setup(e);   break;
+      case AppPhase::Playing:   handle_input_playing(e); break;
+      default: break;
+    }
   }
 }
 
@@ -105,6 +117,7 @@ const char* app_fsm_phase_str() {
   switch (s_phase) {
     case AppPhase::Init:             return "Init";
     case AppPhase::WaitingNet:       return "WaitingNet";
+    case AppPhase::Ready:            return "Ready";
     case AppPhase::Registering:      return "Registering";
     case AppPhase::SettingUp:        return "SettingUp";
     case AppPhase::WaitingGameStart: return "WaitingGameStart";
@@ -112,6 +125,13 @@ const char* app_fsm_phase_str() {
     case AppPhase::End:              return "End";
   }
   return "?";
+}
+
+// Idle screen after connecting: any button press kicks off registration.
+static void handle_input_ready(InputEvent e) {
+  if (e == InputEvent::BtnShort || e == InputEvent::BtnLong) {
+    start_registering();
+  }
 }
 
 static void handle_input_setup(InputEvent e) {

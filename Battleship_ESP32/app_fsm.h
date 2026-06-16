@@ -8,6 +8,7 @@
 enum class AppPhase : uint8_t {
   Init,
   WaitingNet,        // WiFi + MQTT connecting
+  Ready,             // connected, idle screen, waiting for the start button
   Registering,       // register sent, waiting for assign
   SettingUp,         // placing ships
   WaitingGameStart,  // setup sent, waiting for the first state

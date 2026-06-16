@@ -133,13 +133,20 @@ AppPhase app_fsm_phase();
 enum class AppPhase {
   Init,             // boot, mai per voi
   WaitingNet,       // WiFi/MQTT in connessione
-  Registering,      // attesa pairing col server
+  Ready,            // connesso: schermata d'attesa (barchette). Premere il tasto per iniziare
+  Registering,      // attesa pairing col server (transitorio, dura un attimo)
   SettingUp,        // wizard di piazzamento navi
   WaitingGameStart, // setup inviato, attesa che parta partita
   Playing,          // partita in corso
   End,              // partita finita
 };
 ```
+
+**Avvio partita**: dopo la connessione la FSM resta in `Ready` mostrando la
+vostra schermata di attesa. Quando il giocatore preme il pulsante
+(`app_on_input(InputEvent::BtnShort)` o `BtnLong`), noi facciamo partire
+register → setup. Quindi a voi basta: in `Ready` disegnare le barchette e far
+sì che il joystick mandi l'evento del pulsante — al resto pensiamo noi.
 
 ---
 
@@ -161,6 +168,11 @@ void joystick_poll() {
 
 void display_render() {
   switch (app_fsm_phase()) {
+    case AppPhase::Ready:
+      // schermata d'attesa con le barchette; il pulsante avvia la partita
+      draw_idle_boats();
+      break;
+
     case AppPhase::SettingUp:
       // disegnate own_board + anteprima nave corrente (setup_index, setup_dir)
       // + cursore lampeggiante a (cursor_x, cursor_y)
