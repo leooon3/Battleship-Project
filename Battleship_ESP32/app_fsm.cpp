@@ -56,18 +56,20 @@ static void on_assign(const proto::AssignMsg& m) {
 }
 
 static void on_state(const proto::StateMsg& m) {
+  if (m.over) {
+    g_state.winner = m.winner;
+    s_phase = AppPhase::End;
+    Serial.printf("[fsm] game over, winner=%s -> End\n", role_to_str(m.winner));
+    return;
+  }
+
   g_state.turn = m.turn;
-  switch (s_phase) {
-    case AppPhase::Playing:
-      Serial.printf("[fsm] turn -> %s\n", role_to_str(m.turn));
-      break;
-    case AppPhase::End:
-      break;  // game's over for us; server keeps alternating turns
-    default:
-      // First state after setup means the game has started.
-      s_phase = AppPhase::Playing;
-      Serial.printf("[fsm] game start, first turn=%s -> Playing\n", role_to_str(m.turn));
-      break;
+  if (s_phase == AppPhase::Playing) {
+    Serial.printf("[fsm] turn -> %s\n", role_to_str(m.turn));
+  } else if (s_phase != AppPhase::End) {
+    // First state after setup means the game has started.
+    s_phase = AppPhase::Playing;
+    Serial.printf("[fsm] game start, first turn=%s -> Playing\n", role_to_str(m.turn));
   }
 }
 
@@ -75,17 +77,6 @@ static void on_event(const proto::EventMsg& m) {
   Serial.printf("[fsm] event: attacker=%s hit=%s at (%u,%u)\n",
                 role_to_str(m.attacker), hitresult_to_str(m.hit), m.x, m.y);
   game_state_apply_event(m);
-
-  // The server sends no game-over message, so deduce it from the sunk counts.
-  if (s_phase == AppPhase::Playing) {
-    if (g_state.enemy_ships_sunk >= FLEET_COUNT) {
-      s_phase = AppPhase::End;
-      Serial.println("[fsm] WIN -> End");
-    } else if (g_state.my_ships_sunk >= FLEET_COUNT) {
-      s_phase = AppPhase::End;
-      Serial.println("[fsm] LOSS -> End");
-    }
-  }
 }
 
 void app_fsm_begin() {

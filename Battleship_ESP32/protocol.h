@@ -29,8 +29,15 @@ namespace proto {
 
 // Messages received from the server.
 struct AssignMsg { Role role; uint32_t game_id; };
-struct StateMsg  { Role turn; };
 struct EventMsg  { Role attacker; HitResult hit; uint8_t x; uint8_t y; };
+
+// The /state topic carries either {"turn": role} during play or
+// {"winner": role} on the final move.
+struct StateMsg {
+  bool over;
+  Role turn;     // valid when !over
+  Role winner;   // valid when over
+};
 
 bool decode_assign(const char* json, size_t len, AssignMsg& out);
 bool decode_state (const char* json, size_t len, StateMsg&  out);

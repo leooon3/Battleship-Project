@@ -40,9 +40,12 @@ struct GameState {
   Direction setup_dir   = Direction::East;
   Boat      placed_boats[FLEET_COUNT];
 
-  // Sunk ship counts, used to decide win/loss.
+  // Sunk ship counts, for display (progress). Win/loss comes from the server.
   uint8_t my_ships_sunk    = 0;
   uint8_t enemy_ships_sunk = 0;
+
+  // Set when the server declares the game over (phase becomes End).
+  Role winner = Role::None;
 };
 
 extern GameState g_state;

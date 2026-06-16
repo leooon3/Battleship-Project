@@ -31,6 +31,7 @@ void game_state_reset() {
   memset(&g_state, 0, sizeof(g_state));  // Empty / Unknown are 0
   g_state.my_role   = Role::None;
   g_state.turn      = Role::None;
+  g_state.winner    = Role::None;
   g_state.cursor_x  = BOARD_W / 2;
   g_state.cursor_y  = BOARD_H / 2;
   g_state.setup_dir = Direction::East;

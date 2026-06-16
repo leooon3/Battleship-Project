@@ -12,7 +12,7 @@ enum class AppPhase : uint8_t {
   SettingUp,         // placing ships
   WaitingGameStart,  // setup sent, waiting for the first state
   Playing,
-  End,               // a whole fleet sunk (deduced; the server sends no end event)
+  End,               // server declared a winner (see g_state.winner)
 };
 
 void        app_fsm_begin();

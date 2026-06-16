@@ -61,10 +61,18 @@ bool decode_state(const char* json, size_t len, StateMsg& out) {
   JsonDocument doc;
   if (deserializeJson(doc, json, len)) return false;
 
-  Role r = role_from_str(doc["turn"] | (const char*)nullptr);
-  if (r == Role::None) return false;
+  // {"winner": role} ends the game; {"turn": role} is a normal turn update.
+  Role winner = role_from_str(doc["winner"] | (const char*)nullptr);
+  if (winner != Role::None) {
+    out.over = true;
+    out.winner = winner;
+    return true;
+  }
 
-  out.turn = r;
+  Role turn = role_from_str(doc["turn"] | (const char*)nullptr);
+  if (turn == Role::None) return false;
+  out.over = false;
+  out.turn = turn;
   return true;
 }
 

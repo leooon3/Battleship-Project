@@ -95,9 +95,12 @@ struct GameState {
   Direction setup_dir;          // North/East/South/West
   Boat      placed_boats[4];    // navi già confermate
 
-  // Contatori (utili per decidere "ho vinto / ho perso")
-  uint8_t my_ships_sunk;        // 0..4. Se = 4 → ho perso
-  uint8_t enemy_ships_sunk;     // 0..4. Se = 4 → ho vinto
+  // Contatori navi affondate (info di progresso per il display)
+  uint8_t my_ships_sunk;        // 0..4
+  uint8_t enemy_ships_sunk;     // 0..4
+
+  // Chi ha vinto. Valido solo quando la fase è End (lo dice il server).
+  Role winner;                  // Host / Guest / None
 };
 ```
 
@@ -172,8 +175,8 @@ void display_render() {
       break;
 
     case AppPhase::End:
-      if (g_state.enemy_ships_sunk >= 4) draw_victory();
-      else                                draw_defeat();
+      if (g_state.winner == g_state.my_role) draw_victory();
+      else                                   draw_defeat();
       break;
 
     default:
@@ -259,9 +262,8 @@ Viene accodato. La FSM lo processa o lo ignora in base alla fase. Non fa danni
 mai, potete chiamarla sempre.
 
 **Come faccio a sapere se la partita è vinta o persa?**
-- `app_fsm_phase() == AppPhase::End`
-- Se `g_state.enemy_ships_sunk >= 4` → vittoria
-- Se `g_state.my_ships_sunk >= 4` → sconfitta
+- `app_fsm_phase() == AppPhase::End` (lo decide il server, non più noi)
+- `g_state.winner == g_state.my_role` → vittoria, altrimenti sconfitta
 
 **Quale board mostro durante il mio turno?**
 - Mio turno (`turn == my_role`): mostra `enemy_board` (sparo lì)

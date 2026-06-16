@@ -96,7 +96,7 @@ Poi installare **esp32 by Espressif Systems**.
 | Topic | Quando | Payload JSON |
 |---|---|---|
 | `battleship/{MAC}/assign` | dopo register | `{"role":"host","game_id":0}` |
-| `battleship/game/{gid}/state` | dopo assign | `{"turn":"host"}` |
+| `battleship/game/{gid}/state` | dopo assign | `{"turn":"host"}` durante la partita, oppure `{"winner":"host"}` alla mossa finale |
 | `battleship/game/{gid}/{role}/event` | dopo assign | `{"attacker":"host","hit":"Water","position":[x,y]}` |
 
 ### Convenzioni di serializzazione (dal codice Rust)
@@ -153,9 +153,10 @@ Poi installare **esp32 by Espressif Systems**.
 Note:
 - **Riconnessione**: se cade WiFi o MQTT, retry interni. Dopo riconnessione si
   rifà `register`, accettando che parta una nuova partita.
-- **Game over**: il server non manda un evento esplicito di fine. Per ora il
-  firmware resta in `PLAYING` e conta `my_ships_sunk` / `enemy_ships_sunk`
-  per uso del renderer (vittoria/sconfitta dedotte).
+- **Game over**: lo dichiara il server. Alla mossa finale, sul topic `state`
+  arriva `{"winner":role}` invece di `{"turn":role}`. Il firmware passa a `End`
+  e salva `g_state.winner`. I contatori `my_ships_sunk`/`enemy_ships_sunk`
+  restano solo come info di progresso per il display.
 
 ---
 
