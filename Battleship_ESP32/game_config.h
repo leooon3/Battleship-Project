@@ -1,25 +1,18 @@
-// ============================================================================
-// game_config.h
-//
-// Costanti del gioco e della rete. Modificabili senza toccare la logica.
-// Tutto cio' che riguarda display / lettura joystick (brightness, deadzone,
-// debouncing, ecc.) NON sta qui: lo gestisce l'altro team nei loro file.
-// ============================================================================
+// Game and network tunables. Display/joystick settings live in the other
+// team's files, not here.
 #pragma once
 
 #include <Arduino.h>
 
-// --- Dimensione board (combacia col default del server Rust: 8x8) ---
+// Board size, matching the Rust server's 8x8 default.
 constexpr int BOARD_W = 8;
 constexpr int BOARD_H = 8;
 
-// --- Flotta demo concordata: 3 navi da 1 + 1 nave da 2 ---
-// Ordine = ordine in cui il wizard di setup le propone al giocatore.
-// Mettiamo prima la piu' lunga, e' piu' comoda da piazzare per prima.
+// Fleet to place: one 2-cell ship plus three 1-cell ships. The setup wizard
+// offers them in this order (longest first).
 constexpr int FLEET_LENS[] = { 2, 1, 1, 1 };
 constexpr int FLEET_COUNT  = sizeof(FLEET_LENS) / sizeof(FLEET_LENS[0]);
 
-// --- Net / MQTT ---
-constexpr uint32_t WIFI_RETRY_MS      = 2000;
-constexpr uint32_t MQTT_RETRY_MS      = 2000;
-constexpr uint16_t MQTT_KEEPALIVE_S   = 15;
+constexpr uint32_t WIFI_RETRY_MS    = 2000;
+constexpr uint32_t MQTT_RETRY_MS    = 2000;
+constexpr uint16_t MQTT_KEEPALIVE_S = 15;

@@ -169,9 +169,8 @@ Tutti i file in `Battleship_ESP32/` (vincolo Arduino IDE: niente sub-folder).
 | `secrets.h` | credenziali WiFi + indirizzo broker. **Non versionato** |
 | `secrets.example.h` | template versionato |
 | `game_config.h` | `BOARD_W`, `BOARD_H`, `FLEET_LENS`, timing rete |
-| `proto_types.h/.cpp` | enum `Role`, `Direction`, `HitResult`, struct `Boat`, conversioni a/da stringa |
-| `proto_codec.h/.cpp` | encode/decode JSON via ArduinoJson |
-| `net_wifi.h/.cpp` | connessione WiFi (IP statico per ora, workaround DHCP rotto del Pi) + MAC |
+| `protocol.h/.cpp` | tipi del protocollo (`Role`, `Direction`, `HitResult`, `Boat`) + encode/decode JSON via ArduinoJson |
+| `net_wifi.h/.cpp` | connessione WiFi (DHCP) + MAC dagli eFuses |
 | `net_mqtt.h/.cpp` | wrapper espMqttClient: connect, sub, pub, dispatch verso callback |
 | `game_state.h/.cpp` | singleton `g_state`: board, cursore, wizard setup, contatori |
 | `app_fsm.h/.cpp` | FSM + handler input + callback MQTT |

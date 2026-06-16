@@ -1,20 +1,13 @@
-// ============================================================================
-// secrets.example.h
-//
-// Copia questo file come "secrets.h" nella stessa cartella e compila i valori
-// reali. "secrets.h" e' in .gitignore: i valori veri non finiscono mai in git.
-// ============================================================================
+// Copy this file to secrets.h and fill in the real values.
+// secrets.h is gitignored, so credentials never reach the repo.
 #pragma once
 
-// WiFi: l'AP creato dal Raspberry Pi
-#define WIFI_SSID  "battleship-pi"
-#define WIFI_PASS  "your_wifi_password"
+#define WIFI_SSID  "your-wifi"
+#define WIFI_PASS  "your-password"
 
-// MQTT broker: Mosquitto sul Raspberry Pi
-#define MQTT_HOST  "192.168.4.1"   // IP del Pi sull'interfaccia AP
-#define MQTT_PORT  1883            // dal main.rs del server
+#define MQTT_HOST  "192.168.1.10"   // broker IP (the machine running Mosquitto)
+#define MQTT_PORT  1883
 
-// Se il broker richiede autenticazione, definire questi due
-// (lasciare commentati per anonimo, che e' il default del server attuale):
+// Uncomment if the broker requires auth (the server runs anonymous by default).
 // #define MQTT_USER  "..."
 // #define MQTT_PASS  "..."

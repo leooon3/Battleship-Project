@@ -1,23 +1,18 @@
-// ============================================================================
-// app_fsm.h
-//
-// Macchina a stati principale. Coordina rete (net_mqtt) + stato di gioco
-// (game_state) + input dal modulo joystick (hal.h: app_on_input).
-//
-// Non sa nulla di display: il renderer legge dallo stato pubblicato qui.
-// ============================================================================
+// Main state machine. Drives MQTT (register/assign/setup/shoot) from joystick
+// input and incoming server messages. The display team reads the resulting
+// phase via app_fsm_phase().
 #pragma once
 
 #include <Arduino.h>
 
 enum class AppPhase : uint8_t {
   Init,
-  WaitingNet,         // attesa WiFi + MQTT
-  Registering,        // pubblicato register, attesa assign
-  SettingUp,          // wizard interattivo di piazzamento navi
-  WaitingGameStart,   // setup inviato, attesa primo state dal server
-  Playing,            // partita in corso
-  End,                // (al momento mai raggiunto: nessun evento di fine dal server)
+  WaitingNet,        // WiFi + MQTT connecting
+  Registering,       // register sent, waiting for assign
+  SettingUp,         // placing ships
+  WaitingGameStart,  // setup sent, waiting for the first state
+  Playing,
+  End,               // a whole fleet sunk (deduced; the server sends no end event)
 };
 
 void        app_fsm_begin();

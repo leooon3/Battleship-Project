@@ -1,17 +1,11 @@
-// ============================================================================
-// net_wifi.h
-//
-// Wrapper sottile sopra WiFi.h del core Arduino-ESP32. Connessione station
-// con auto-reconnect e accesso al MAC formattato (canonico "AA:BB:CC:DD:EE:FF").
-// ============================================================================
+// WiFi station connection with auto-reconnect.
 #pragma once
 
 #include <Arduino.h>
 
-void        net_wifi_begin(const char* ssid, const char* pass);
-void        net_wifi_loop();
-bool        net_wifi_is_connected();
+void net_wifi_begin(const char* ssid, const char* pass);
+void net_wifi_loop();
+bool net_wifi_is_connected();
 
-// Restituisce il MAC come stringa "AA:BB:CC:DD:EE:FF" (uppercase, con due punti).
-// Puntatore a buffer interno statico — valido per tutta la vita del programma.
+// MAC as "AA:BB:CC:DD:EE:FF" (static buffer, valid for the whole run).
 const char* net_wifi_mac();
