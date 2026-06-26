@@ -110,6 +110,20 @@ int longest_boat(std::map<int, int> availableBoats) {
   return -1;
 }
 
+bool boat_contains(int next_x, int next_y){
+ 
+  for (auto &boat : setup_boat) {
+    int x0 = boat.initial_pos[0], y0 = boat.initial_pos[1];
+    switch (boat.dir) {
+      case NORTH: if (next_x == x0 && next_y >= y0 && next_y <= (y0 + boat.len -1)) return true; break;
+      case SOUTH: if (next_x == x0 && next_y <= y0 && next_y >= (y0 - boat.len +1)) return true; break;
+      case EAST:  if (next_y == y0 && next_x >= x0 && next_x <= (x0 + boat.len -1)) return true; break;
+      case WEST:  if (next_y == y0 && next_x <= x0 && next_x >= (x0 - boat.len +1)) return true; break;
+    }
+  }
+  return false;
+}
+
 bool illegal(int next_x, int next_y, int longest) {
   bool ret = false;
   if (next_x * next_y != 0 && (next_x != 0 || next_y != 0)) {
@@ -123,10 +137,15 @@ bool illegal(int next_x, int next_y, int longest) {
     ret = true;
   }
 
-  if ((cursor_y + next_y) < 0 && (cursor_y + next_y) >= MATRIX_HEIGHT) {
+  if ((cursor_y + next_y) < 0 || (cursor_y + next_y) >= MATRIX_HEIGHT) {
     ret = true;
   }
   Serial.println("return value : " + String(ret));
+
+  if(boat_contains((next_x + cursor_x), (next_y + cursor_y))){
+    ret = true;
+  }
+
 
   return ret;
 }
@@ -141,7 +160,8 @@ void setup_state() {
   int longest;
 
   while ((longest = longest_boat(availableBoats)) > 0) {
-
+    cursor_x = 0;
+    cursor_y = 0;
     Serial.println("longest : " + String(longest));
     while (digitalRead(JOYSTICK_BUTTON)) {
       int x = readJoystickAxis(JOYSTICK_Y);
@@ -150,17 +170,17 @@ void setup_state() {
       int next_cursor_x = cursor_x + x;
       int next_cursor_y = cursor_y + y;
 
-      matrix.drawPixel(cursor_x, cursor_y, matrix.Color(0, 0, 0));
-
-      if (next_cursor_x >= 0 && next_cursor_x < MATRIX_WIDTH) {
-        cursor_x += x;
+      if (next_cursor_x >= 0 && next_cursor_x < MATRIX_WIDTH && next_cursor_y >= 0 && next_cursor_y < MATRIX_HEIGHT && !boat_contains(next_cursor_x, next_cursor_y) ) {
+          
+        if (!boat_contains(cursor_x, cursor_y)){
+          matrix.drawPixel(cursor_x, cursor_y, matrix.Color(0,0,0));
+        }
+        
+        cursor_x = next_cursor_x;
+        cursor_y = next_cursor_y;
+        matrix.drawPixel(cursor_x, cursor_y, matrix.Color(0,0,255));
       }
 
-      if (next_cursor_y >= 0 && next_cursor_y < MATRIX_HEIGHT) {
-        cursor_y += y;
-      }
-
-      matrix.drawPixel(cursor_x, cursor_y, matrix.Color(0, 0, 255));
       matrix.show();
       delay(100);
     }
@@ -177,6 +197,7 @@ void setup_state() {
       int y = readJoystickAxis(JOYSTICK_X);
 
       if (x == 0 && y == 0) {
+        delay(100);
         continue;
       }
 
@@ -209,19 +230,59 @@ void setup_state() {
     int length = 0;
     if (offset_x > 0) {
       dir = EAST;
-      length = offset_x;
+      length = offset_x + 1;
     } else if (offset_x < 0) {
       dir = WEST;
-      length = abs(offset_x);
+      length = abs(offset_x) + 1;
     } else if (offset_y > 0) {
       dir = NORTH;
-      length = offset_y;
+      length = offset_y + 1;
     } else {
       dir = SOUTH;
-      length = abs(offset_y);
+      length = abs(offset_y) + 1;
+    }
+
+    auto it = availableBoats.find(length);
+    if (it != availableBoats.end() && it->second > 0) {
+      it -> second -= 1;
+    }else{
+      delay(100);
+      switch(dir){
+        case NORTH:
+          for(int i = cursor_y; i < (cursor_y+length); i++){
+            matrix.drawPixel(cursor_x, i, matrix.Color(0, 0, 0));
+          }
+          break;
+        
+        case SOUTH:
+          for(int i = cursor_y; i > (cursor_y-length); i--){
+            matrix.drawPixel(cursor_x, i, matrix.Color(0, 0, 0));
+          }
+          break;
+
+        case WEST:
+          for(int i = cursor_x; i > (cursor_x-length); i--){
+            matrix.drawPixel(i, cursor_y, matrix.Color(0, 0, 0));
+          }
+          break;
+
+        case EAST:
+          for(int i = cursor_x; i < (cursor_x+length); i++){
+            matrix.drawPixel(i, cursor_y, matrix.Color(0, 0, 0));
+          }
+          break;
+      }
+      offset_x = 0;
+      offset_y = 0;
+      // e poi continua
+      continue;
     }
 
     setup_boat.push_back({ length, dir, { cursor_x, cursor_y } });
+    //DIMINUIRE VALUE
+    
+    // cursor_x = 0;
+    // cursor_y = 0;
   }
 
 
