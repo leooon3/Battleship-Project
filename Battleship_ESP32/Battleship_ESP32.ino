@@ -1,13 +1,12 @@
-// TEST driver for the synchronous facade (battle.h). Plays a full game in a
-// linear, blocking style, reading shots from the Serial Monitor, so the facade
-// can be exercised without joystick/matrix hardware.
+// Entry point: runs the interface team's code (matrix + joystick), which drives
+// the facade (battle.*). This is the real game with hardware.
 //
-// In production this file is replaced by the interface team's sketch: their
-// display + joystick code, calling the same battle_* functions in the same
-// linear way.
+// The Serial-only facade test driver (no matrix/joystick needed) lives in git
+// history, in the commit before the interface integration — restore it there if
+// you ever need to test the facade without the hardware.
 //
-// Libraries: espMqttClient (Bert Melis), AsyncTCP (ESP32Async), ArduinoJson v7.
-// Fill in secrets.h, flash, open Serial Monitor at 115200.
+// Libraries: espMqttClient (Bert Melis), AsyncTCP (ESP32Async), ArduinoJson v7,
+// Adafruit GFX / NeoMatrix / NeoPixel. Fill in secrets.h, flash at 115200.
 
 #include "interface.h"
 

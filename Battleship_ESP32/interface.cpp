@@ -33,18 +33,8 @@ enum State {
   RESULT,
 };
 
-enum Direction {
-  NORTH,
-  EAST,
-  SOUTH,
-  WEST,
-};
-
-struct Boat {
-  int len;
-  Direction dir;
-  int initial_pos[2];
-};
+// Direction and Boat come from protocol.h (via battle.h) — same names and
+// layout as before, so the code below is unchanged.
 
 State current_state;
 std::vector<Boat> setup_boat;
@@ -53,7 +43,7 @@ Role my_role;
 void interface_setup() {
 
 
-  Serial.begin(115200));
+  Serial.begin(115200);
   pinMode(JOYSTICK_BUTTON, INPUT_PULLUP);
   pinMode(JOYSTICK_X, INPUT);
   pinMode(JOYSTICK_Y, INPUT);
@@ -287,16 +277,16 @@ void setup_state() {
     
   }
 
-  battle_send_setup(setup_boat);
+  battle_send_setup(setup_boat.data(), setup_boat.size());
 
   matrix.clear();
   matrix.show();
   
   int timer = 0;
-  //AGGIUNGERE CONTROLLO WAITING GAME START
-  while ( timer<2 ){
+  
+  while (!battle_game_started() || timer<2 ){
     Serial.println("Entra nel while colore");
-
+    
     for (int i = MATRIX_HEIGHT-1; i >= 0; i--){
       for (int j = 0; j < MATRIX_WIDTH; j++){
         matrix.drawPixel(j, i, matrix.Color(0, 255, 0));
@@ -308,13 +298,11 @@ void setup_state() {
 
     }
 
+
     timer += 1;
 
   }
-  while(digitalRead(JOYSTICK_BUTTON)){
-    matrix.drawPixel(4, 4, matrix.Color(0, 255, 0));
-    matrix.show();
-  }
+ 
 
   current_state = PLAYING;
 
@@ -323,23 +311,25 @@ void setup_state() {
 void playing_state(){
   
   if( battle_my_turn() ){
+    cursor_x = 0;
+    cursor_y = 0;
     matrix.clear();
     for (int i = 0; i < MATRIX_HEIGHT; i++){
       for(int j = 0; j < MATRIX_WIDTH; j++){
         switch (g_state.enemy_board[j][i]){
-          case Unknown:
+          case EnemyCell::Unknown:
             matrix.drawPixel(j, i, matrix.Color(0, 0, 0));
             break;
 
-          case Hit:
+          case EnemyCell::Hit:
             matrix.drawPixel(j, i, matrix.Color(255, 128, 0));
             break;
 
-          case Miss:
+          case EnemyCell::Miss:
             matrix.drawPixel(j, i, matrix.Color(0, 0, 255));
             break;
 
-          case Sunk:
+          case EnemyCell::Sunk:
             matrix.drawPixel(j, i, matrix.Color(255, 0, 0));
             break;
         }
@@ -353,6 +343,8 @@ void playing_state(){
     while (digitalRead(JOYSTICK_BUTTON)) {
       int x = readJoystickAxis(JOYSTICK_Y);
       int y = readJoystickAxis(JOYSTICK_X);
+
+      if (x == 0 && y == 0) continue;
 
       int next_cursor_x = cursor_x + x;
       int next_cursor_y = cursor_y + y;
@@ -368,23 +360,25 @@ void playing_state(){
         matrix.drawPixel(cursor_x, cursor_y, matrix.Color(255,255,255));
 
         switch(g_state.enemy_board[previous_x][previous_y]){
-          case Unknown:
+          case EnemyCell::Unknown:
             matrix.drawPixel(previous_x, previous_y, matrix.Color(0, 0, 0));
             break;
 
-          case Hit:
+          case EnemyCell::Hit:
             matrix.drawPixel(previous_x, previous_y, matrix.Color(255, 128, 0));
             break;
 
-          case Miss:
+          case EnemyCell::Miss:
             matrix.drawPixel(previous_x, previous_y, matrix.Color(0, 0, 255));
             break;
 
-          case Sunk:
+          case EnemyCell::Sunk:
             matrix.drawPixel(previous_x, previous_y, matrix.Color(255, 0, 0));
             break;
         }
       }
+      matrix.show();
+      delay(100);
     }
 
     while (!digitalRead(JOYSTICK_BUTTON)) {
@@ -392,45 +386,47 @@ void playing_state(){
     }
 
     switch(battle_shoot(cursor_x, cursor_y)){
-      
-      case Hit:
+
+      case HitResult::Hit:
         matrix.drawPixel(cursor_x, cursor_y, matrix.Color(255, 128, 0));
         break;
 
-      case Water:
+      case HitResult::Water:
         matrix.drawPixel(cursor_x, cursor_y, matrix.Color(0, 0, 255));
         break;
 
-      case Sunk:
+      case HitResult::Sunk:
         matrix.drawPixel(cursor_x, cursor_y, matrix.Color(255, 0, 0));
         break;
     }
 
-    battle_await_change();
+    matrix.show();    
+    delay(1000);      
 
+    
 
   }else{
     matrix.clear();
     for (int i = 0; i < MATRIX_HEIGHT; i++){
       for(int j = 0; j < MATRIX_WIDTH; j++){
-        switch (own_board[j][i]){
-          case Empty:
+        switch (g_state.own_board[j][i]){
+          case OwnCell::Empty:
             matrix.drawPixel(j, i, matrix.Color(0, 0, 0));
             break;
 
-          case Hit:
+          case OwnCell::Hit:
             matrix.drawPixel(j, i, matrix.Color(255, 128, 0));
             break;
 
-          case Miss:
+          case OwnCell::Miss:
             matrix.drawPixel(j, i, matrix.Color(0, 0, 255));
             break;
 
-          case Sunk:
+          case OwnCell::Sunk:
             matrix.drawPixel(j, i, matrix.Color(255, 0, 0));
             break;
 
-          case Ship:
+          case OwnCell::Ship:
             matrix.drawPixel(j, i, matrix.Color(255, 255, 255));
             break;
         }
@@ -438,10 +434,31 @@ void playing_state(){
 
     }
 
+    
 
+    
     
 
     matrix.show();
+    uint8_t opponent_x;
+    uint8_t opponent_y;
+    HitResult hit = battle_wait_for_opponent_shot(opponent_x, opponent_y);
+
+    switch(hit){
+      case HitResult::Hit:
+        matrix.drawPixel(opponent_x, opponent_y, matrix.Color(255, 128, 0));
+        break;
+
+      case HitResult::Water:
+        matrix.drawPixel(opponent_x, opponent_y, matrix.Color(0, 0, 255));
+        break;
+
+      case HitResult::Sunk:
+        matrix.drawPixel(opponent_x, opponent_y, matrix.Color(255, 0, 0));
+        break;
+    }
+    matrix.show();
+    delay(1000);
     battle_await_change();
 
   }
