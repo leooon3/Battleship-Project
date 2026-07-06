@@ -7,7 +7,7 @@ che condividono lo stesso sketch Arduino:
   JSON, macchina a stati di partita, stato locale del gioco.
 - **Altro gruppo**: driver matrice LED + lettura joystick, sui pin dell'ESP32.
 
-Il confine tra i due lati è descritto nella [§7](#7-confine-coi-moduli-display-joystick).
+Il confine tra i due lati è descritto nella [§7](#7-confine-col-team-interface).
 
 ---
 
@@ -42,9 +42,9 @@ si collega a Mosquitto come un altro client MQTT.
 - **Matrice 8×8 RGB** (WS2812B-compatibile): collegata via GPIO, gestita dall'altro team
 - **Joystick analogico** (2 assi + pulsante): collegato via ADC1 + GPIO, gestito dall'altro team
 
-Il nostro codice **non legge ADC e non scrive sui LED**. Riceve eventi input
-via `app_on_input(InputEvent)` e mette tutto lo stato di gioco in `g_state`
-(struct globale in `game_state.h`) da cui l'altro team legge per disegnare.
+Il nostro codice **non legge ADC e non scrive sui LED**. Espone la facciata
+sincrona `battle.*` (che l'altro team chiama) e la vista `g_state` in
+`game_state.h` (che l'altro team legge per disegnare).
 
 ---
 
@@ -111,56 +111,45 @@ Poi installare **esp32 by Espressif Systems**.
 
 ---
 
-## 5. Macchina a stati
+## 5. Architettura: facciata sincrona + task di rete
+
+Il firmware espone al team interface una **facciata sincrona** (`battle.h`): una
+serie di funzioni bloccanti che si usano in modo lineare. Dietro, la rete gira su
+un **task FreeRTOS dedicato** (core 0), quindi la connessione resta viva anche
+mentre l'interface blocca (attesa tasto, attesa avversario…).
 
 ```
-       ┌────────┐
-       │  BOOT  │  init Serial, WiFi, MQTT, FSM
-       └───┬────┘
-           ▼
-   ┌────────────────┐
-   │ WAITINGNET     │   WiFi + MQTT non ancora connessi
-   └───┬────────────┘
-       ▼ MQTT connesso: sub battleship/{MAC}/assign
-   ┌────────────────┐
-   │     READY      │   schermata d'attesa (barchette)
-   │                │   il giocatore preme il pulsante per iniziare
-   └───┬────────────┘
-       ▼ BtnShort/BtnLong
-   ┌────────────────┐
-   │  REGISTERING   │   pub battleship/register {"id":MAC}
-   └───┬────────────┘
-       ▼ ricevuto assign(role, game_id)
-       │ sub battleship/game/{gid}/state e .../{role}/event
-   ┌────────────────┐
-   │     SETUP      │   wizard: per ogni nave in FLEET_LENS
-   │                │     - InputEvent::Up/Down/Left/Right → muovi cursore
-   │                │     - InputEvent::BtnShort → ruota direzione
-   │                │     - InputEvent::BtnLong  → conferma piazzamento
-   │                │   alla fine pub Action::Setup(boats)
-   └───┬────────────┘
-       ▼
-   ┌────────────────────┐
-   │ WAITINGGAMESTART   │   attende state(turn) dal server
-   └───┬────────────────┘
-       ▼
-   ┌────────────────┐
-   │    PLAYING     │
-   │                │   - se turn == mio: cursore mira sul campo avversario,
-   │                │     BtnShort → pub Action::Shoot
-   │                │   - se turn != mio: input ignorato
-   │                │   - on event: aggiorno own_board o enemy_board
-   │                │   - on state: aggiorno turno
-   └────────────────┘
+  core 0 (task net)                    core 1 (loop / interface)
+  ─────────────────                    ─────────────────────────
+  net_wifi_loop()   ── keep alive       battle_begin()      → blocca finché MQTT su
+  net_mqtt_loop()      + reconnect       battle_register()   → pub register, attende assign
+                                         battle_send_setup() → pub setup, attende game start
+  callback MQTT (task async espMqttClient):   battle_shoot()      → pub shoot, attende event
+    on_assign / on_state / on_event            battle_await_change() → attende turno/fine
+    → aggiornano g_state + flag            battle_my_turn/over/winner() → leggono i flag
+```
+
+Flusso lineare tipico (lato interface):
+```
+battle_begin();
+... schermata attesa, aspetta pulsante ...
+Role me = battle_register();
+... piazza navi -> boats[] ...
+battle_send_setup(boats, n);
+while (!battle_over()) {
+  if (battle_my_turn()) { ...mira...; HitResult r = battle_shoot(x,y); ...disegna... }
+  else                  { battle_await_change(); ...ridisegna da g_state... }
+}
+... battle_winner() ...
 ```
 
 Note:
-- **Riconnessione**: se cade WiFi o MQTT, retry interni. Dopo riconnessione si
-  rifà `register`, accettando che parta una nuova partita.
-- **Game over**: lo dichiara il server. Alla mossa finale, sul topic `state`
-  arriva `{"winner":role}` invece di `{"turn":role}`. Il firmware passa a `End`
-  e salva `g_state.winner`. I contatori `my_ships_sunk`/`enemy_ships_sunk`
-  restano solo come info di progresso per il display.
+- **Sincronizzazione**: i callback MQTT (task async) scrivono `g_state` + flag
+  volatili; le `battle_*` (task interface) li leggono in polling con `vTaskDelay`.
+  Letture di singole celle/scalari sono atomiche → niente mutex.
+- **Riconnessione**: il task di rete rifà WiFi/MQTT se cadono.
+- **Game over**: lo dichiara il server (`{"winner":role}` sul topic `state`);
+  `battle_over()` diventa true e `battle_winner()` dà il vincitore.
 
 ---
 
@@ -170,50 +159,40 @@ Tutti i file in `Battleship_ESP32/` (vincolo Arduino IDE: niente sub-folder).
 
 | File | Responsabilità |
 |---|---|
-| `Battleship_ESP32.ino` | `setup()` + `loop()` |
+| `Battleship_ESP32.ino` | driver di test della facciata (in produzione: sketch del team interface) |
 | `secrets.h` | credenziali WiFi + indirizzo broker. **Non versionato** |
 | `secrets.example.h` | template versionato |
 | `game_config.h` | `BOARD_W`, `BOARD_H`, `FLEET_LENS`, timing rete |
 | `protocol.h/.cpp` | tipi del protocollo (`Role`, `Direction`, `HitResult`, `Boat`) + encode/decode JSON via ArduinoJson |
-| `net_wifi.h/.cpp` | connessione WiFi (DHCP) + MAC dagli eFuses |
+| `net_wifi.h/.cpp` | connessione WiFi (lista reti, DHCP) + MAC dagli eFuses |
 | `net_mqtt.h/.cpp` | wrapper espMqttClient: connect, sub, pub, dispatch verso callback |
-| `game_state.h/.cpp` | singleton `g_state`: board, cursore, wizard setup, contatori |
-| `app_fsm.h/.cpp` | FSM + handler input + callback MQTT |
-| `hal.h` | interfaccia input dal team joystick (`app_on_input(InputEvent)`) |
+| `game_state.h/.cpp` | singleton `g_state`: sola vista board (own/enemy) + contatori affondati |
+| `battle.h/.cpp` | **la facciata sincrona** + task di rete + callback MQTT |
 
 ---
 
-## 7. Confine coi moduli display + joystick
+## 7. Confine col team interface
 
-Il punto di contatto col secondo team è **minimale e simmetrico**:
+Il contatto è tramite la **facciata sincrona** (`battle.h`) + `g_state` in sola lettura.
 
-### Loro → noi: input
-Il team joystick chiama:
-```cpp
-void app_on_input(InputEvent e);   // dichiarata in hal.h
-```
-con eventi discreti: `Up`, `Down`, `Left`, `Right`, `BtnShort`, `BtnLong`.
-Quando rilevano un movimento o un click, ci chiamano. Sta a loro fare deadzone,
-debounce, repeat-rate.
+### Loro → noi: chiamano le `battle_*`
+Il team interface scrive un programma lineare che chiama:
+`battle_begin`, `battle_register`, `battle_send_setup(boats,n)`, `battle_my_turn`,
+`battle_over`, `battle_winner`, `battle_shoot(x,y)`, `battle_await_change`.
+Input (joystick) e piazzamento navi sono **loro**: ci passano solo il risultato
+(`boats[]` al setup, `x,y` allo sparo).
 
-### Noi → loro: stato di gioco
-Il team display legge **direttamente** il singleton `g_state` (in `game_state.h`):
-- `g_state.my_role`, `g_state.turn`, `g_state.game_id`
+### Noi → loro: stato di gioco in sola lettura
+Leggono `g_state` (`game_state.h`) per disegnare:
 - `g_state.own_board[x][y]` (`OwnCell::Empty|Ship|Hit|Sunk|Miss`)
 - `g_state.enemy_board[x][y]` (`EnemyCell::Unknown|Miss|Hit|Sunk`)
-- `g_state.cursor_x`, `g_state.cursor_y`
-- `g_state.setup_index`, `g_state.placed_boats[]` (per anteprima setup)
 - `g_state.my_ships_sunk`, `g_state.enemy_ships_sunk`
 
-In più possono usare `app_fsm_phase()` per sapere in che fase siamo (Setup,
-Playing, ...). Da queste info disegnano come preferiscono (color scheme,
-animazioni, pulsazioni cursore...).
+Le board si aggiornano da sole (le scriviamo noi sui callback MQTT). Dettagli e
+esempi in `INTERFACE_GUIDE.md`.
 
 ### Cosa NON facciamo noi
-- NO `digitalWrite` / `analogRead`
-- NO `FastLED` / `NeoPixel`
-- NO scelta dei pin
-- NO render
+- NO `digitalWrite` / `analogRead`, NO `FastLED` / `NeoPixel`, NO scelta pin, NO render
 
 ---
 

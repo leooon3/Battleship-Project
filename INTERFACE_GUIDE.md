@@ -1,16 +1,21 @@
 # Guida per il team Interface 👋
 
-Tutto quello che vi serve per collegare il vostro codice (joystick + matrice LED)
-al nostro (rete + MQTT + logica di gioco). Documento corto apposta: 5 minuti
-di lettura e potete cominciare.
+Come collegare il vostro codice (joystick + matrice LED) al nostro (rete + MQTT +
+server) tramite una **facciata sincrona**: voi scrivete un normale programma
+lineare/bloccante — quello che già volevate — e noi gestiamo tutta la rete dietro.
 
 ---
 
 ## TL;DR
 
-1. **Quando il joystick si muove o si clicca**, chiamate `app_on_input(InputEvent)`
-2. **Quando dovete disegnare la matrice**, leggete la variabile globale `g_state`
-3. **Non vi serve sapere niente** di WiFi, MQTT, JSON, server. Quello lo facciamo noi sotto.
+1. Chiamate le funzioni **`battle_*`** (in `battle.h`) in ordine, come un programma
+   bloccante normale. Ognuna ritorna quando il server ha risposto.
+2. Leggete **`g_state`** (`game_state.h`) per sapere cosa disegnare.
+3. Voi fate **tutto** l'input (joystick) e l'output (matrice). Di WiFi, MQTT, JSON,
+   turni, server **non vi occupate**: sta tutto dietro le `battle_*`.
+
+La rete gira su un **core separato**, quindi mentre voi bloccate (attesa tasto,
+attesa avversario…) la connessione **non cade mai**.
 
 ---
 
@@ -22,275 +27,237 @@ cd Battleship-Project
 git checkout interface
 ```
 
-Tutto il codice (vostro e nostro) vive nella cartella `Battleship_ESP32/` come
-unico sketch Arduino. Voi aggiungete file nuovi (es. `display.cpp`,
-`joystick.cpp`, `pins.h`), noi non li tocchiamo.
+Tutto lo sketch vive in `Battleship_ESP32/`. Voi aggiungete i vostri file
+(`display.cpp`, `joystick.cpp`, `pins.h`, …) e scrivete il `.ino` principale che
+usa le `battle_*`. I nostri file (`battle.*`, `net_*`, `protocol.*`, `game_state.*`)
+non li toccate.
 
 ---
 
-## 1️⃣ Cosa chiamate VOI quando il giocatore agisce
-
-📂 File: `Battleship_ESP32/hal.h`
+## 1️⃣ La facciata — `battle.h`
 
 ```cpp
-enum class InputEvent : uint8_t {
-  Up,        // joystick verso l'alto   (cursore y+1)
-  Down,      // joystick verso il basso (cursore y-1)
-  Left,      // joystick a sinistra     (cursore x-1)
-  Right,     // joystick a destra       (cursore x+1)
-  BtnShort,  // click corto del pulsante
-  BtnLong,   // click lungo del pulsante
-};
-
-void app_on_input(InputEvent e);
+void      battle_begin();                            // connette (blocca finché MQTT è su)
+Role      battle_register();                          // register + attende il ruolo assegnato
+void      battle_send_setup(const Boat* boats, size_t n); // invia la flotta + attende inizio partita
+bool      battle_my_turn();                           // NON bloccante: è il mio turno?
+bool      battle_over();                              // NON bloccante: partita finita?
+Role      battle_winner();                            // valido dopo battle_over()
+HitResult battle_shoot(uint8_t x, uint8_t y);         // spara + attende l'esito
+void      battle_await_change();                      // blocca finché torna il mio turno / fine partita
 ```
 
-Esempio d'uso nel vostro codice:
+Le funzioni **bloccanti** ritornano solo quando il round-trip col server è finito.
+Quando `battle_shoot` ritorna, le board in `g_state` sono **già aggiornate**.
+
+---
+
+## 2️⃣ Esempio completo (il vostro `.ino`)
+
+Tutto si legge come un programma sincrono:
 
 ```cpp
-#include "hal.h"
+#include "battle.h"
+#include "game_state.h"
+#include "game_config.h"
+// + le vostre lib (FastLED, ecc.)
 
-void joystick_poll() {
-  // ... il vostro debouncing, deadzone, repeat-rate ecc.
-  if (joystick_just_moved_up())    app_on_input(InputEvent::Up);
-  if (joystick_just_moved_down())  app_on_input(InputEvent::Down);
-  if (button_just_short_pressed()) app_on_input(InputEvent::BtnShort);
-  if (button_just_long_pressed())  app_on_input(InputEvent::BtnLong);
+void setup() {
+  interface_hw_init();          // VOSTRO: FastLED, pin joystick
+  battle_begin();               // NOSTRO: connette (blocca; intanto mostrate "connessione")
+}
+
+void loop() {
+  interface_show_waiting();     // VOSTRO: schermata barchette
+  interface_wait_button();      // VOSTRO: aspettate il pulsante (bloccante, come già fate)
+
+  Role me = battle_register();  // NOSTRO: pairing col server (blocca)
+
+  Boat boats[FLEET_COUNT];
+  size_t n = interface_place_ships(boats);   // VOSTRO: il vostro setup, riempie boats[]
+  battle_send_setup(boats, n);  // NOSTRO: invia + attende che parta la partita (blocca)
+
+  while (!battle_over()) {
+    if (battle_my_turn()) {
+      uint8_t x, y;
+      interface_aim(&x, &y);              // VOSTRO: mira col joystick
+      HitResult r = battle_shoot(x, y);   // NOSTRO: spara + esito (blocca)
+      interface_show_shot(x, y, r);       // VOSTRO: disegnate l'esito
+    } else {
+      interface_show_own_board();         // VOSTRO: mostrate la vostra flotta
+      battle_await_change();              // NOSTRO: blocca finché l'avversario muove / fine
+    }
+  }
+
+  interface_show_result(battle_winner()); // VOSTRO: vittoria/sconfitta
 }
 ```
 
-### Note importanti
-
-- **Eventi discreti**: una chiamata = uno step. Se il giocatore tiene il joystick
-  in alto per 1 secondo e voi volete che il cursore si muova 5 volte, chiamate
-  `app_on_input(Up)` 5 volte (con il vostro repeat-rate).
-- **Sempre sicuro**: potete chiamarla anche da ISR. Noi accodiamo l'evento e lo
-  processiamo nel loop principale.
-- **Non vi serve sapere in che fase è il gioco**: il significato dell'input
-  cambia in base alla fase (in `SettingUp` un click corto ruota la nave, in
-  `Playing` un click corto spara), ma la FSM ci pensa lei. Voi mandate sempre
-  l'evento grezzo.
+> ⚠️ **Mentre una `battle_*` blocca, il vostro `loop()` è fermo lì**: nessuna
+> animazione gira durante l'attesa. Per un gioco a turni va bene (disegnate lo
+> stato, poi bloccate). Se volete animazioni *durante* le attese (es. un'onda
+> mentre aspettate l'avversario), ditecelo: si fa con un task display separato.
 
 ---
 
-## 2️⃣ Cosa leggete VOI per disegnare
-
-📂 File: `Battleship_ESP32/game_state.h`
+## 3️⃣ Cosa leggete per disegnare — `game_state.h`
 
 ```cpp
-extern GameState g_state;   // variabile globale, includete game_state.h
+extern GameState g_state;
 
 struct GameState {
-  Role     my_role;             // Host, Guest, o None (non ancora assegnato)
-  uint32_t game_id;
-  Role     turn;                // di chi è il turno
-
-  OwnCell   own_board  [BOARD_W][BOARD_H];   // la VOSTRA flotta
+  Role     my_role;                          // Host / Guest
+  OwnCell   own_board  [BOARD_W][BOARD_H];   // la VOSTRA flotta + colpi subiti
   EnemyCell enemy_board[BOARD_W][BOARD_H];   // quello che sapete dell'avversario
-
-  uint8_t cursor_x, cursor_y;   // posizione del cursore
-
-  // Wizard piazzamento navi (fase SettingUp)
-  uint8_t   setup_index;        // quale nave sto piazzando ora (0..3)
-  Direction setup_dir;          // North/East/South/West
-  Boat      placed_boats[4];    // navi già confermate
-
-  // Contatori navi affondate (info di progresso per il display)
-  uint8_t my_ships_sunk;        // 0..4
-  uint8_t enemy_ships_sunk;     // 0..4
-
-  // Chi ha vinto. Valido solo quando la fase è End (lo dice il server).
-  Role winner;                  // Host / Guest / None
+  uint8_t my_ships_sunk;                     // 0..N (progresso, per il display)
+  uint8_t enemy_ships_sunk;                  // 0..N
 };
 ```
 
-### Cosa significa una cella
+### Significato delle celle
 
 ```cpp
 enum class OwnCell {
-  Empty,  // acqua vuota
-  Ship,   // mia nave intatta
-  Hit,    // mia nave colpita
-  Sunk,   // mia nave affondata
-  Miss,   // avversario ha sparato qui ma era acqua
+  Empty,  // acqua
+  Ship,   // vostra nave intatta
+  Hit,    // vostra nave colpita
+  Sunk,   // vostra nave affondata
+  Miss,   // l'avversario ha sparato qui a vuoto
 };
 
 enum class EnemyCell {
-  Unknown,  // non ho ancora sparato qui
-  Miss,     // ho sparato e ho mancato
-  Hit,      // ho colpito (ma la nave non è affondata)
-  Sunk,     // ho affondato la nave
+  Unknown,  // non avete ancora sparato qui
+  Miss,     // sparato e mancato
+  Hit,      // colpito (nave ancora viva)
+  Sunk,     // affondata
 };
 ```
 
-### In che fase siamo? (per decidere cosa disegnare)
+Le board si aggiornano da sole (le scriviamo noi quando arriva un evento dal
+server). Voi le leggete e basta.
 
-📂 File: `Battleship_ESP32/app_fsm.h`
+### La fase corrente (per decidere COSA disegnare)
 
+📂 `app_fsm.h`
 ```cpp
-AppPhase app_fsm_phase();
-
 enum class AppPhase {
-  Init,             // boot, mai per voi
-  WaitingNet,       // WiFi/MQTT in connessione
-  Ready,            // connesso: schermata d'attesa (barchette). Premere il tasto per iniziare
-  Registering,      // attesa pairing col server (transitorio, dura un attimo)
-  SettingUp,        // wizard di piazzamento navi
-  WaitingGameStart, // setup inviato, attesa che parta partita
-  Playing,          // partita in corso
-  End,              // partita finita
+  Init, WaitingNet, Ready, Registering, SettingUp, WaitingGameStart, Playing, End
+};
+AppPhase app_fsm_phase();     // fase corrente, aggiornata da noi
+```
+
+Se preferite pilotare il display in base a una **fase** (invece di seguire il
+flusso lineare delle `battle_*`), leggete `app_fsm_phase()`: è la stessa
+informazione, la teniamo aggiornata noi. Esempio:
+```cpp
+switch (app_fsm_phase()) {
+  case AppPhase::Ready:    draw_waiting();  break;   // barchette, attesa start
+  case AppPhase::SettingUp:draw_setup();    break;
+  case AppPhase::Playing:  draw_boards();   break;
+  case AppPhase::End:      draw_result();   break;
+  default:                 draw_connecting();break;
+}
+```
+
+---
+
+## 4️⃣ Le navi del setup — `Boat`
+
+`interface_place_ships` (codice vostro) deve riempire un array di `Boat` e
+ritornarne il numero. Poi lo passate a `battle_send_setup`. La flotta richiesta è
+in `FLEET_LENS` (`game_config.h`).
+
+```cpp
+struct Boat {
+  uint8_t   x, y;      // cella di partenza
+  Direction dir;       // North / East / South / West (la nave si estende da (x,y) in questa direzione)
+  uint8_t   len;       // lunghezza
 };
 ```
 
-**Avvio partita**: dopo la connessione la FSM resta in `Ready` mostrando la
-vostra schermata di attesa. Quando il giocatore preme il pulsante
-(`app_on_input(InputEvent::BtnShort)` o `BtnLong`), noi facciamo partire
-register → setup. Quindi a voi basta: in `Ready` disegnare le barchette e far
-sì che il joystick mandi l'evento del pulsante — al resto pensiamo noi.
-
----
-
-## 3️⃣ Schema mentale del vostro codice
-
+Esempio (una nave da 2 orizzontale + una da 1):
 ```cpp
-#include "hal.h"
-#include "game_state.h"
-#include "app_fsm.h"
-// + le vostre lib (FastLED, ecc.)
-
-void display_setup()  { /* FastLED.addLeds... */ }
-void joystick_setup() { /* pinMode, ecc. */ }
-
-void joystick_poll() {
-  // leggete ADC, debouncing, edge detection
-  // → chiamate app_on_input(...) sui fronti
-}
-
-void display_render() {
-  switch (app_fsm_phase()) {
-    case AppPhase::Ready:
-      // schermata d'attesa con le barchette; il pulsante avvia la partita
-      draw_idle_boats();
-      break;
-
-    case AppPhase::SettingUp:
-      // disegnate own_board + anteprima nave corrente (setup_index, setup_dir)
-      // + cursore lampeggiante a (cursor_x, cursor_y)
-      break;
-
-    case AppPhase::Playing:
-      if (g_state.turn == g_state.my_role) {
-        // mio turno: disegnate enemy_board + cursore di mira
-      } else {
-        // turno avversario: disegnate own_board (vedete i colpi che subite)
-      }
-      break;
-
-    case AppPhase::End:
-      if (g_state.winner == g_state.my_role) draw_victory();
-      else                                   draw_defeat();
-      break;
-
-    default:
-      // Init, WaitingNet, Registering, WaitingGameStart
-      draw_connecting_animation();
-      break;
-  }
-}
+boats[0] = { 0, 0, Direction::East,  2 };  // (0,0)-(1,0)
+boats[1] = { 3, 5, Direction::North, 1 };  // (3,5)
 ```
 
-Nel `Battleship_ESP32.ino` chiamate il vostro `display_setup()`/`joystick_setup()`
-nel `setup()` esistente, e `joystick_poll()`/`display_render()` nel `loop()`.
+Il **modello di piazzamento** (come il giocatore sceglie le navi col joystick) è
+**vostro** — potete tenere il vostro setup a trascinamento. Alla fine ci passate
+solo l'array `boats[]`.
 
 ---
 
-## 4️⃣ Coordinate
+## 5️⃣ Coordinate
 
 - Board 8×8: `x ∈ [0..7]`, `y ∈ [0..7]`
-- `x=0` è a sinistra, `x=7` a destra
-- **`y=0` è in BASSO, `y=7` è in ALTO** (combacia col server Rust)
-- Joystick "Up" → cursore `y+1`
+- `x=0` a sinistra, `x=7` a destra
+- **`y=0` in BASSO, `y=7` in ALTO** (combacia col server)
 
-Quando piazzate i LED fisicamente, ricordatevi questa convenzione (o specchiate
-nel mapping `(x, y) → indice LED`).
+Sulla matrice fisica fate voi la conversione riga (spesso `riga = ALTEZZA-1 - y`).
 
 ---
 
-## 5️⃣ Cosa NON fate
+## 6️⃣ Cosa fate voi / cosa NON fate
 
-- ❌ Niente `WiFi.begin`, niente client MQTT, niente JSON
-- ❌ Non scrivete su `g_state` (lo aggiorniamo noi quando il server manda eventi)
-- ❌ Niente `Serial.begin(115200)` nel `setup()` (l'abbiamo già fatto noi)
-- ❌ Non toccate i file in `net_*`, `proto_*`, `app_fsm*`, `game_state*`
+**Fate voi:**
+- ✅ Driver matrice LED (FastLED/NeoPixel), colori, animazioni, mapping `(x,y)→LED`
+- ✅ Lettura joystick (ADC, deadzone, debounce), pin GPIO (`pins.h` vostro)
+- ✅ Il modello di piazzamento navi (riempite `boats[]`)
+- ✅ La mira (scegliete `x,y` e chiamate `battle_shoot`)
+- ✅ Il `.ino` principale (`setup`/`loop`) con le `battle_*`
 
-## 6️⃣ Cosa fate VOI
-
-- ✅ Driver matrice LED (FastLED, NeoPixel, qualunque)
-- ✅ Lettura ADC joystick, deadzone, edge detection, debouncing, repeat-rate
-- ✅ Soglia click corto vs lungo (consigliato ~600ms)
-- ✅ Scelta dei pin GPIO (mettete un `pins.h` vostro)
-- ✅ Brightness, color palette, animazioni
-- ✅ Mapping fisico `(x, y) → indice LED` della matrice
-- ✅ Le vostre `setup()` e `loop()` chiamate dal main `.ino`
+**Non fate:**
+- ❌ Niente `WiFi.begin`, client MQTT, JSON
+- ❌ Non scrivete su `g_state` (lo aggiorniamo noi) — solo lettura
+- ❌ Non toccate `battle.*`, `net_*`, `protocol.*`, `game_state.*`
 
 ---
 
-## 6.5 ️⃣ Test in isolamento (senza server)
+## 7️⃣ Test in isolamento (senza server)
 
-Se volete provare il vostro codice display/input senza far partire server Rust +
-Mosquitto, potete:
-
-**Forzare uno stato a mano** nel vostro `setup()`:
+Per provare display/input senza rete, potete forzare a mano le board e non
+chiamare le `battle_*`:
 ```cpp
-g_state.my_role = Role::Host;
-g_state.turn    = Role::Host;
-g_state.own_board[3][3] = OwnCell::Ship;
-g_state.cursor_x = 4;
-g_state.cursor_y = 4;
-// poi il vostro display_render() disegnerà di conseguenza
+void setup() {
+  interface_hw_init();
+  g_state.my_role = Role::Host;
+  g_state.own_board[3][3] = OwnCell::Ship;
+  g_state.enemy_board[2][2] = EnemyCell::Hit;
+}
+void loop() { interface_redraw(); }   // disegnate quello che leggete
 ```
 
-**Iniettare input fake**:
-```cpp
-delay(1000);
-app_on_input(InputEvent::Up);     // simula joystick in alto
-delay(500);
-app_on_input(InputEvent::BtnShort);
-```
-
-Per il test col server vero (ESP32 connesso al broker), vedi `ARCHITECTURE.md`
-sezione 9 — c'è uno snippet PowerShell che simula un secondo giocatore.
+Per il test col server vero, vedi `ARCHITECTURE.md` — c'è uno snippet PowerShell
+che simula un secondo giocatore via `mosquitto_pub`.
 
 ---
 
-## 7️⃣ FAQ veloci
+## 8️⃣ FAQ
 
-**Come ricevo notifiche quando lo stato cambia?**
-Non c'è callback. Disegnate ogni ~30 fps leggendo `g_state`. Se è cambiato, lo
-vedete al prossimo frame.
+**Le `battle_*` bloccano davvero? Non si pianta la rete?**
+Bloccano il *vostro* loop, non la rete: WiFi/MQTT girano su un core separato e
+restano vivi. Quando il server risponde, la funzione ritorna.
 
-**Cosa succede se chiamo `app_on_input` in una fase dove non ha senso?**
-Viene accodato. La FSM lo processa o lo ignora in base alla fase. Non fa danni
-mai, potete chiamarla sempre.
+**Come so se ho vinto o perso?**
+Dopo che `battle_over()` è true: `battle_winner() == g_state.my_role` → vittoria,
+altrimenti sconfitta.
 
-**Come faccio a sapere se la partita è vinta o persa?**
-- `app_fsm_phase() == AppPhase::End` (lo decide il server, non più noi)
-- `g_state.winner == g_state.my_role` → vittoria, altrimenti sconfitta
+**Quale board mostro?**
+- Mio turno: `enemy_board` (dove sparo)
+- Turno avversario: `own_board` (dove mi spara)
 
-**Quale board mostro durante il mio turno?**
-- Mio turno (`turn == my_role`): mostra `enemy_board` (sparo lì)
-- Turno avversario: mostra `own_board` (vedo dove mi spara)
+**Quante navi nel setup?**
+Vedi `FLEET_LENS` in `game_config.h` (ora: una da 2 + tre da 1). Se volete una
+flotta diversa, si cambia lì insieme.
 
-**Quante navi devo aspettarmi nel setup wizard?**
-4 navi totali: una `len=2` e tre `len=1`. La sequenza è in `FLEET_LENS` in
-`game_config.h`. Il giocatore le piazza una alla volta tramite il wizard
-(`Up/Down/Left/Right` muove cursore, `BtnShort` ruota, `BtnLong` conferma).
+**Il cursore lo gestite voi?**
+Sì: nel modello a facciata l'input è tutto vostro. Noi non tracciamo più un
+cursore — voi scegliete le coordinate e ce le passate (`battle_shoot`, `boats[]`).
 
-**Posso modificare `Battleship_ESP32.ino`?**
-Sì. Per inserire le vostre `setup`/`loop` di hardware. Coordinatevi con noi via
-PR per non finire in conflitti di merge.
+**Posso animare durante l'attesa dell'avversario?**
+Nel modello lineare no (il loop è fermo dentro `battle_await_change`). Se serve,
+lo facciamo con un task display separato — chiedete.
 
 ---
 
-Se qualcosa non torna o c'è un'ambiguità in questo doc → ditecelo, lo chiariamo
-subito. Buon lavoro!
+Se qualcosa non torna, ditecelo e lo chiariamo. Buon lavoro!
