@@ -45,6 +45,7 @@ bool      battle_over();                              // NON bloccante: partita 
 Role      battle_winner();                            // valido dopo battle_over()
 HitResult battle_shoot(uint8_t x, uint8_t y);         // spara + attende l'esito
 void      battle_await_change();                      // blocca finché torna il mio turno / fine partita
+HitResult battle_wait_for_opponent_shot(uint8_t& out_x, uint8_t& out_y); // blocca finché l'avversario non spara, restituisce coord ed esito
 ```
 
 Le funzioni **bloccanti** ritornano solo quando il round-trip col server è finito.
@@ -84,8 +85,9 @@ void loop() {
       HitResult r = battle_shoot(x, y);   // NOSTRO: spara + esito (blocca)
       interface_show_shot(x, y, r);       // VOSTRO: disegnate l'esito
     } else {
-      interface_show_own_board();         // VOSTRO: mostrate la vostra flotta
-      battle_await_change();              // NOSTRO: blocca finché l'avversario muove / fine
+      uint8_t ox, oy;
+      HitResult r = battle_wait_for_opponent_shot(ox, oy); // NOSTRO: blocca finché l'avversario spara
+      interface_show_opponent_shot(ox, oy, r);  // VOSTRO: disegnate il colpo subito
     }
   }
 
@@ -163,22 +165,25 @@ switch (app_fsm_phase()) {
 
 ## 4️⃣ Le navi del setup — `Boat`
 
-`interface_place_ships` (codice vostro) deve riempire un array di `Boat` e
-ritornarne il numero. Poi lo passate a `battle_send_setup`. La flotta richiesta è
-in `FLEET_LENS` (`game_config.h`).
+Il vostro codice di piazzamento deve riempire un array (o vector) di `Boat` e
+passarlo a `battle_send_setup`. La flotta richiesta è in `FLEET_LENS`
+(`game_config.h`). Il tipo `Boat` e l'`enum Direction` sono definiti in
+`protocol.h` (incluso da `battle.h`) e sono **identici** ai vostri:
 
 ```cpp
+enum Direction { NORTH, EAST, SOUTH, WEST };
+
 struct Boat {
-  uint8_t   x, y;      // cella di partenza
-  Direction dir;       // North / East / South / West (la nave si estende da (x,y) in questa direzione)
-  uint8_t   len;       // lunghezza
+  int       len;            // lunghezza
+  Direction dir;            // NORTH / EAST / SOUTH / WEST
+  int       initial_pos[2]; // [x, y] di partenza
 };
 ```
 
-Esempio (una nave da 2 orizzontale + una da 1):
+Esempio (una nave da 4 verso est + una da 2 verso nord):
 ```cpp
-boats[0] = { 0, 0, Direction::East,  2 };  // (0,0)-(1,0)
-boats[1] = { 3, 5, Direction::North, 1 };  // (3,5)
+boats[0] = { 4, EAST,  {0, 0} };  // (0,0)-(3,0)
+boats[1] = { 2, NORTH, {3, 5} };  // (3,5)-(3,6)
 ```
 
 Il **modello di piazzamento** (come il giocatore sceglie le navi col joystick) è

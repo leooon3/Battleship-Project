@@ -16,10 +16,11 @@
 //     if (battle_my_turn()) {
 //       ... aim (x,y) ...
 //       HitResult r = battle_shoot(x, y);
-//       ... draw the shot ...
+//       ... draw the shot result ...
 //     } else {
-//       battle_await_change();            // wait for the opponent / game over
-//       ... redraw from g_state ...
+//       uint8_t ox, oy;
+//       HitResult r = battle_wait_for_opponent_shot(ox, oy);
+//       ... draw the opponent's shot at (ox, oy) ...
 //     }
 //   }
 //   ... show battle_winner() ...
@@ -38,3 +39,5 @@ bool      battle_over();                              // non-blocking
 Role      battle_winner();                            // valid once battle_over() is true
 HitResult battle_shoot(uint8_t x, uint8_t y);         // fire + wait for the result
 void      battle_await_change();                      // block until my turn again, or game over
+HitResult battle_wait_for_opponent_shot(uint8_t& out_x, uint8_t& out_y); // block until opponent fires, return coords and hit result
+

@@ -20,10 +20,10 @@ Role role_from_str(const char* s) {
 
 const char* direction_to_str(Direction d) {
   switch (d) {
-    case Direction::North: return "North";
-    case Direction::East:  return "East";
-    case Direction::South: return "South";
-    case Direction::West:  return "West";
+    case NORTH: return "North";
+    case EAST:  return "East";
+    case SOUTH: return "South";
+    case WEST:  return "West";
   }
   return "North";
 }

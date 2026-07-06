@@ -11,10 +11,10 @@ void game_state_reset() {
 void game_state_mark_ship(const Boat& b) {
   int8_t dx = 0, dy = 0;
   switch (b.dir) {
-    case Direction::North: dy = +1; break;
-    case Direction::East:  dx = +1; break;
-    case Direction::South: dy = -1; break;
-    case Direction::West:  dx = -1; break;
+    case NORTH: dy = +1; break;
+    case EAST:  dx = +1; break;
+    case SOUTH: dy = -1; break;
+    case WEST:  dx = -1; break;
   }
   for (int i = 0; i < b.len; i++) {
     int x = b.initial_pos[0] + dx * i;

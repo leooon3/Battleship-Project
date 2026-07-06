@@ -28,6 +28,11 @@ static volatile Role      s_winner      = Role::None;
 static volatile bool      s_shot_wait   = false;   // a shot is awaiting its result
 static volatile bool      s_shot_ready  = false;
 static volatile HitResult s_shot_result = HitResult::Water;
+static volatile bool      s_opp_shot_ready  = false;
+static volatile uint8_t   s_opp_shot_x      = 0;
+static volatile uint8_t   s_opp_shot_y      = 0;
+static volatile HitResult s_opp_shot_result = HitResult::Water;
+static volatile bool      s_state_ready     = false;
 static bool               s_mqtt_started = false;
 
 // Game phase, exposed to the display via app_fsm_phase() (app_fsm.h).
@@ -71,11 +76,13 @@ static void on_state(const proto::StateMsg& m) {
     s_winner = m.winner;
     s_phase = AppPhase::End;
     s_over = true;
+    s_state_ready = true;
     return;
   }
   s_my_turn = (m.turn == g_state.my_role);
   s_phase = AppPhase::Playing;
   s_started = true;
+  s_state_ready = true;
 }
 
 static void on_event(const proto::EventMsg& m) {
@@ -84,6 +91,11 @@ static void on_event(const proto::EventMsg& m) {
     s_shot_result = m.hit;
     s_shot_wait = false;
     s_shot_ready = true;
+  } else if (m.attacker != g_state.my_role) {
+    s_opp_shot_x = m.x;
+    s_opp_shot_y = m.y;
+    s_opp_shot_result = m.hit;
+    s_opp_shot_ready = true;
   }
 }
 
@@ -146,12 +158,31 @@ Role battle_winner()  { return s_winner; }
 
 HitResult battle_shoot(uint8_t x, uint8_t y) {
   s_shot_ready = false;
+  s_state_ready = false;
   s_shot_wait = true;
   net_mqtt_publish_shoot(g_state.game_id, g_state.my_role, x, y);
   wait_until(s_shot_ready);
+  wait_until(s_state_ready);
   return s_shot_result;
 }
 
 void battle_await_change() {
   while (!s_my_turn && !s_over) vTaskDelay(pdMS_TO_TICKS(5));
 }
+
+HitResult battle_wait_for_opponent_shot(uint8_t& out_x, uint8_t& out_y) {
+  s_opp_shot_ready = false;
+  s_state_ready = false;
+  while (!s_opp_shot_ready && !s_over) vTaskDelay(pdMS_TO_TICKS(5));
+  if (s_over && !s_opp_shot_ready) {
+    // Game ended without an event (e.g. disconnect). Return safe defaults.
+    out_x = 0;
+    out_y = 0;
+    return HitResult::Water;
+  }
+  wait_until(s_state_ready);
+  out_x = s_opp_shot_x;
+  out_y = s_opp_shot_y;
+  return s_opp_shot_result;
+}
+

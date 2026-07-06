@@ -10,7 +10,7 @@
 #include <Arduino.h>
 
 enum class Role : uint8_t { Host, Guest, None };
-enum class Direction : uint8_t { North, East, South, West };
+enum Direction { NORTH, EAST, SOUTH, WEST };
 enum class HitResult : uint8_t { Water, Hit, Sunk };
 
 // Same layout as the interface team's Boat, so they can build it directly.

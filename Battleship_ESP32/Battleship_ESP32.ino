@@ -17,10 +17,10 @@
 // Hardcoded fleet for the test: 4-cell, 3-cell and two 2-cell ships.
 // Boat layout is { len, dir, {x, y} }.
 static const Boat TEST_FLEET[FLEET_COUNT] = {
-  { 4, Direction::East, {0, 0} },   // (0,0)-(3,0)
-  { 3, Direction::East, {0, 2} },   // (0,2)-(2,2)
-  { 2, Direction::East, {0, 4} },   // (0,4)-(1,4)
-  { 2, Direction::East, {0, 6} },   // (0,6)-(1,6)
+  { 4, EAST, {0, 0} },   // (0,0)-(3,0)
+  { 3, EAST, {0, 2} },   // (0,2)-(2,2)
+  { 2, EAST, {0, 4} },   // (0,4)-(1,4)
+  { 2, EAST, {0, 6} },   // (0,6)-(1,6)
 };
 
 static char own_char(OwnCell c) {
@@ -111,7 +111,9 @@ void setup() {
       Serial.printf("shot (%u,%u) -> %s\n", x, y, hitresult_to_str(r));
     } else {
       Serial.println(".. opponent's turn, waiting ..");
-      battle_await_change();
+      uint8_t ox, oy;
+      HitResult or_ = battle_wait_for_opponent_shot(ox, oy);
+      Serial.printf("opponent shot (%u,%u) -> %s\n", ox, oy, hitresult_to_str(or_));
     }
   } 
 
