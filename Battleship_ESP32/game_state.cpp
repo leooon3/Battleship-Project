@@ -16,9 +16,9 @@ void game_state_mark_ship(const Boat& b) {
     case Direction::South: dy = -1; break;
     case Direction::West:  dx = -1; break;
   }
-  for (uint8_t i = 0; i < b.len; i++) {
-    int x = b.x + dx * i;
-    int y = b.y + dy * i;
+  for (int i = 0; i < b.len; i++) {
+    int x = b.initial_pos[0] + dx * i;
+    int y = b.initial_pos[1] + dy * i;
     if (x >= 0 && x < BOARD_W && y >= 0 && y < BOARD_H)
       g_state.own_board[x][y] = OwnCell::Ship;
   }

@@ -112,8 +112,8 @@ size_t encode_setup(const Boat* boats, size_t count, char* out, size_t out_size)
   for (size_t i = 0; i < count; i++) {
     JsonObject b = setup.add<JsonObject>();
     JsonArray pos = b["starting_position"].to<JsonArray>();
-    pos.add(boats[i].x);
-    pos.add(boats[i].y);
+    pos.add(boats[i].initial_pos[0]);
+    pos.add(boats[i].initial_pos[1]);
     b["direction"] = direction_to_str(boats[i].dir);
     b["len"]       = boats[i].len;
   }

@@ -247,8 +247,8 @@ altrimenti sconfitta.
 - Turno avversario: `own_board` (dove mi spara)
 
 **Quante navi nel setup?**
-Vedi `FLEET_LENS` in `game_config.h` (ora: una da 2 + tre da 1). Se volete una
-flotta diversa, si cambia lì insieme.
+Vedi `FLEET_LENS` in `game_config.h` (ora: due da 2, una da 3, una da 4 — come
+la vostra `availableBoats`). Se volete una flotta diversa, si cambia lì insieme.
 
 **Il cursore lo gestite voi?**
 Sì: nel modello a facciata l'input è tutto vostro. Noi non tracciamo più un

@@ -13,11 +13,11 @@ enum class Role : uint8_t { Host, Guest, None };
 enum class Direction : uint8_t { North, East, South, West };
 enum class HitResult : uint8_t { Water, Hit, Sunk };
 
+// Same layout as the interface team's Boat, so they can build it directly.
 struct Boat {
-  uint8_t   x;
-  uint8_t   y;
+  int       len;
   Direction dir;
-  uint8_t   len;
+  int       initial_pos[2];   // [x, y]
 };
 
 const char* role_to_str(Role r);

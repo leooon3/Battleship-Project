@@ -8,9 +8,9 @@
 constexpr int BOARD_W = 8;
 constexpr int BOARD_H = 8;
 
-// Fleet to place: one 2-cell ship plus three 1-cell ships. The setup wizard
-// offers them in this order (longest first).
-constexpr int FLEET_LENS[] = { 2, 1, 1, 1 };
+// Fleet to place: two 2-cell ships, one 3-cell, one 4-cell. Both sides must
+// agree on this set (the interface places the ships, we just transmit them).
+constexpr int FLEET_LENS[] = { 4, 3, 2, 2 };
 constexpr int FLEET_COUNT  = sizeof(FLEET_LENS) / sizeof(FLEET_LENS[0]);
 
 constexpr uint32_t MQTT_RETRY_MS    = 2000;
