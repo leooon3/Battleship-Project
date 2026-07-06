@@ -196,7 +196,7 @@ void setup_state() {
       int x = readJoystickAxis(JOYSTICK_Y);
       int y = readJoystickAxis(JOYSTICK_X);
 
-      if (x == 0 && y == 0) {
+      if (x == 0 && y == 0 || x * y != 0) {
         delay(100);
         continue;
       }
@@ -274,30 +274,34 @@ void setup_state() {
       }
       offset_x = 0;
       offset_y = 0;
-      // e poi continua
+      
       continue;
     }
 
     setup_boat.push_back({ length, dir, { cursor_x, cursor_y } });
-    //DIMINUIRE VALUE
     
-    // cursor_x = 0;
-    // cursor_y = 0;
+  }
+  //MANDARE SEGNALE BARCHE POSIZIONATE
+  int timer = 0;
+  //AGGIUNGERE CONTROLLO WAITING GAME START
+  while ( timer<5 ){
+
+    for (int i = MATRIX_HEIGHT-1; i >= 0; i--){
+      for (int j = 0; j < MATRIX_WIDTH; j++){
+        matrix.drawPixel(j, i, matrix.Color(0, 255, 0));
+        matrix.drawPixel(j, i, matrix.Color(0, 0, 0));
+      }
+
+    }
+
+    timer += 1;
+
+  }
+  while(digitalRead(JOYSTICK_BUTTON)){
+    matrix.drawPixel(4, 4, matrix.Color(0, 255, 0));
   }
 
 
-
-  // while(digitalRead(JOYSTICK_BUTTON)){
-  //   cursor_movement();
-  //   Serial.println("Dentro");
-  // }
-  //   Serial.println("Esceeeeee");
-
-
-
-  // while(digitalRead(JOYSTICK_BUTTON)){
-  //   boat_positioning(position);
-  // }
 }
 
 
@@ -313,16 +317,5 @@ void loop() {
       break;
   }
 
-
-
-
-
-
-
-  // int button = !digitalRead(JOYSTICK_BUTTON);
-
-  // Serial.print("x: " + String(x));
-  // Serial.print("\ty: " + String(y));
-  //Serial.println("\tbutton: " + String(button));
   delay(250);
 }
