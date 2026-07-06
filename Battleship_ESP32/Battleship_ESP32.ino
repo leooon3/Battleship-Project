@@ -99,6 +99,8 @@ void setup() {
 
   Serial.println("sending setup...");
   battle_send_setup(TEST_FLEET, FLEET_COUNT);
+  Serial.println("waiting for opponent...");
+  while (!battle_game_started()) delay(50);
   Serial.println("game started!");
 
   while (!battle_over()) {

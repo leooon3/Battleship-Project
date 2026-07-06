@@ -33,7 +33,8 @@
 
 void      battle_begin();                             // connect (blocks until MQTT is up)
 Role      battle_register();                          // register + wait for the assigned role
-void      battle_send_setup(const Boat* boats, size_t n);  // send fleet + wait for game start
+void      battle_send_setup(const Boat* boats, size_t n);  // send fleet (non-blocking, returns immediately)
+bool      battle_game_started();                          // non-blocking: true when both players are ready and the game begins
 bool      battle_my_turn();                           // non-blocking
 bool      battle_over();                              // non-blocking
 Role      battle_winner();                            // valid once battle_over() is true

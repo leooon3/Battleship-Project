@@ -149,8 +149,9 @@ void battle_send_setup(const Boat* boats, size_t n) {
   s_started = false;
   s_phase = AppPhase::WaitingGameStart;
   net_mqtt_publish_setup(g_state.game_id, g_state.my_role, boats, n);
-  while (!s_started && !s_over) vTaskDelay(pdMS_TO_TICKS(5));
 }
+
+bool battle_game_started() { return s_started || s_over; }
 
 bool battle_my_turn() { return s_my_turn; }
 bool battle_over()    { return s_over; }
