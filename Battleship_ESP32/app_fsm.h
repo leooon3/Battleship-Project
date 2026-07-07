@@ -1,6 +1,4 @@
-// Game phase, for driving the display. The facade (battle.cpp) keeps this
-// updated as the match progresses. Read it if you prefer switching on a phase
-// to decide what to draw, instead of following the linear battle_* flow.
+// Game phase, updated as the match progresses
 #pragma once
 
 #include <Arduino.h>

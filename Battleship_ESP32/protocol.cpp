@@ -28,14 +28,6 @@ const char* direction_to_str(Direction d) {
   return "North";
 }
 
-const char* hitresult_to_str(HitResult h) {
-  switch (h) {
-    case HitResult::Water: return "Water";
-    case HitResult::Hit:   return "Hit";
-    case HitResult::Sunk:  return "Sunk";
-  }
-  return "Water";
-}
 
 static HitResult hitresult_from_str(const char* s) {
   if (s && !strcmp(s, "Hit"))  return HitResult::Hit;
@@ -61,7 +53,7 @@ bool decode_state(const char* json, size_t len, StateMsg& out) {
   JsonDocument doc;
   if (deserializeJson(doc, json, len)) return false;
 
-  // {"winner": role} ends the game; {"turn": role} is a normal turn update.
+  // {"winner": role} ends the game; {"turn": role} is a turn update.
   Role winner = role_from_str(doc["winner"] | (const char*)nullptr);
   if (winner != Role::None) {
     out.over = true;
@@ -120,4 +112,4 @@ size_t encode_setup(const Boat* boats, size_t count, char* out, size_t out_size)
   return serializeJson(doc, out, out_size);
 }
 
-}  // namespace proto
+}

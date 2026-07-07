@@ -1,6 +1,6 @@
 // MQTT client wrapper around espMqttClient. Builds topic strings internally
 // from the MAC, game_id and role, decodes incoming payloads and hands them to
-// the registered callbacks.
+// the registered callbacks
 #pragma once
 
 #include "protocol.h"
@@ -15,7 +15,6 @@ void net_mqtt_begin(const char* host, uint16_t port,
                     const char* user, const char* pass,
                     const char* client_id_mac);
 void net_mqtt_loop();
-bool net_mqtt_is_connected();
 
 void net_mqtt_set_on_connected(OnMqttConnected cb);
 void net_mqtt_set_on_assign   (OnMqttAssign cb);

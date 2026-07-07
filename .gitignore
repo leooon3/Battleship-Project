@@ -8,6 +8,7 @@ build/
 
 # Local secrets
 Battleship_ESP32/secrets.h
+guida_spiegazione.md
 
 # Editors
 .vscode/

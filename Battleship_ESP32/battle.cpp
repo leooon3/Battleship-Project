@@ -7,18 +7,13 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
-// Networks to try, highest priority first (see secrets.h). Each carries its own
-// broker address because they differ per network.
+// Networks to try, highest priority first
 static const WifiNet NETS[] = {
   { WIFI_PI_SSID, WIFI_PI_PASS, WIFI_PI_MQTT, WIFI_PI_IP, WIFI_PI_GW },
   { WIFI_FB_SSID, WIFI_FB_PASS, WIFI_FB_MQTT, WIFI_FB_IP, WIFI_FB_GW },
 };
 
-// --- shared state ---
-// Written by the MQTT callbacks (which run on the async network task) and
-// polled by the battle_* functions (which run on the caller's task). Plain
-// scalars: single-word reads/writes are atomic on the ESP32, and the callers
-// spin with vTaskDelay so the updates are seen.
+// Written by the MQTT callbacks and polled by the battle_* functions
 static volatile bool      s_mqtt_up     = false;
 static volatile bool      s_assigned    = false;
 static volatile bool      s_started     = false;
@@ -35,7 +30,7 @@ static volatile HitResult s_opp_shot_result = HitResult::Water;
 static volatile bool      s_state_ready     = false;
 static bool               s_mqtt_started = false;
 
-// Game phase, exposed to the display via app_fsm_phase() (app_fsm.h).
+// Game phase, exposed to the display
 static volatile AppPhase  s_phase = AppPhase::Init;
 
 AppPhase app_fsm_phase() { return s_phase; }
@@ -54,10 +49,10 @@ const char* app_fsm_phase_str() {
   return "?";
 }
 
-// --- MQTT callbacks (run on the network task) ---
+// --- MQTT callbacks ---
 
 static void on_connected() {
-  // Subscribe to our reply topic before anyone publishes a register.
+  // Subscribe to reply topic before anyone publishes a register.
   net_mqtt_subscribe_assign(net_wifi_mac());
   s_phase = AppPhase::Ready;
   s_mqtt_up = true;
@@ -113,7 +108,7 @@ static void net_task(void*) {
 #endif
       s_mqtt_started = true;
     }
-    if (s_mqtt_started) net_mqtt_loop();  // only after net_mqtt_begin(); before it the client is unconfigured
+    if (s_mqtt_started) net_mqtt_loop();
     vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
@@ -176,7 +171,7 @@ HitResult battle_wait_for_opponent_shot(uint8_t& out_x, uint8_t& out_y) {
   s_state_ready = false;
   while (!s_opp_shot_ready && !s_over) vTaskDelay(pdMS_TO_TICKS(5));
   if (s_over && !s_opp_shot_ready) {
-    // Game ended without an event (e.g. disconnect). Return safe defaults.
+    // Game ended without an event => Return safe defaults.
     out_x = 0;
     out_y = 0;
     return HitResult::Water;

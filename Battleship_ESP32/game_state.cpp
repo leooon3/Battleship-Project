@@ -28,7 +28,7 @@ void game_state_apply_event(const proto::EventMsg& e) {
   if (e.x >= BOARD_W || e.y >= BOARD_H) return;
 
   if (e.attacker == g_state.my_role) {
-    // My shot landed on the opponent's board.
+    // I hit a ship
     EnemyCell& c = g_state.enemy_board[e.x][e.y];
     switch (e.hit) {
       case HitResult::Water: c = EnemyCell::Miss; break;
@@ -36,7 +36,7 @@ void game_state_apply_event(const proto::EventMsg& e) {
       case HitResult::Sunk:  c = EnemyCell::Sunk; g_state.enemy_ships_sunk++; break;
     }
   } else {
-    // The opponent fired at my board.
+    // Opponent hit my board
     OwnCell& c = g_state.own_board[e.x][e.y];
     switch (e.hit) {
       case HitResult::Water: if (c == OwnCell::Empty) c = OwnCell::Miss; break;

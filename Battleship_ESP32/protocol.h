@@ -13,17 +13,15 @@ enum class Role : uint8_t { Host, Guest, None };
 enum Direction { NORTH, EAST, SOUTH, WEST };
 enum class HitResult : uint8_t { Water, Hit, Sunk };
 
-// Same layout as the interface team's Boat, so they can build it directly.
 struct Boat {
   int       len;
   Direction dir;
-  int       initial_pos[2];   // [x, y]
+  int       initial_pos[2];   // x, y
 };
 
 const char* role_to_str(Role r);
 Role        role_from_str(const char* s);
 const char* direction_to_str(Direction d);
-const char* hitresult_to_str(HitResult h);
 
 namespace proto {
 
@@ -36,7 +34,7 @@ struct EventMsg  { Role attacker; HitResult hit; uint8_t x; uint8_t y; };
 struct StateMsg {
   bool over;
   Role turn;     // valid when !over
-  Role winner;   // valid when over
+  Role winner;   // the opposite
 };
 
 bool decode_assign(const char* json, size_t len, AssignMsg& out);
@@ -49,4 +47,4 @@ size_t encode_register(const char* mac, char* out, size_t out_size);
 size_t encode_shoot(uint8_t x, uint8_t y, char* out, size_t out_size);
 size_t encode_setup(const Boat* boats, size_t count, char* out, size_t out_size);
 
-}  // namespace proto
+}

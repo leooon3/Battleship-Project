@@ -14,7 +14,7 @@ static OnMqttAssign    s_cb_assign    = nullptr;
 static OnMqttState     s_cb_state     = nullptr;
 static OnMqttEvent     s_cb_event     = nullptr;
 
-// Outgoing payload buffer. The largest message is a 4-boat Setup (~280 bytes).
+// Outgoing payload buffer. The largest message is a 4-boat Setup
 static char s_out_buf[512];
 
 static bool ends_with(const char* s, const char* suffix) {
@@ -37,7 +37,7 @@ static void on_disconnect(espMqttClientTypes::DisconnectReason reason) {
 static void on_message(const espMqttClientTypes::MessageProperties&,
                        const char* topic, const uint8_t* payload,
                        size_t len, size_t index, size_t total) {
-  // Our payloads are short and never fragmented; drop anything that is.
+  // drop anything that is fragmented
   if (index != 0 || len != total) return;
 
   char buf[512];
@@ -87,8 +87,6 @@ void net_mqtt_loop() {
     s_last_attempt_ms = millis();
   }
 }
-
-bool net_mqtt_is_connected() { return s_connected; }
 
 void net_mqtt_set_on_connected(OnMqttConnected cb) { s_cb_connected = cb; }
 void net_mqtt_set_on_assign   (OnMqttAssign cb)    { s_cb_assign    = cb; }

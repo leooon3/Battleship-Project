@@ -52,8 +52,7 @@ void net_wifi_begin(const WifiNet* nets, size_t count) {
   WiFi.setAutoReconnect(true);
   WiFi.setSleep(false);
 
-  // Read the MAC from eFuses: WiFi.macAddress() can be all-zeros before the
-  // driver is up on some core versions.
+  // Read the MAC from eFuses: WiFi.macAddress()
   uint8_t mac[6] = {0};
   esp_read_mac(mac, ESP_MAC_WIFI_STA);
   snprintf(s_mac, sizeof(s_mac), "%02X:%02X:%02X:%02X:%02X:%02X",
@@ -80,8 +79,7 @@ void net_wifi_loop() {
   if (connected) return;
 
   if (millis() - s_attempt_ms > PROFILE_TIMEOUT_MS) {
-    // Current network didn't come up. Prefer the best one on air (which may be
-    // the same one again = retry); otherwise round-robin to the next.
+    // Current network didn't come up. Prefer the best one on air
     int best = scan_for_best();
     connect_profile(best >= 0 ? best : (s_current + 1) % s_count);
   }
