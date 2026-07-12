@@ -54,8 +54,6 @@ void set_starting_cursor_position(int &cursor_x, int &cursor_y) {
       cursor_x = j;
       cursor_y = i - j;
 
-      Serial.println("Cursor is " + String(cursor_x) + ", " + String(cursor_y));
-
       if (!boat_contains(cursor_x, cursor_y))
         return;
     }
@@ -101,7 +99,7 @@ bool illegal(int next_x, int next_y, int longest) {
   if ((cursor_y + next_y) < 0 || (cursor_y + next_y) >= MATRIX_HEIGHT) {
     ret = true;
   }
-  Serial.println("return value : " + String(ret));
+ 
 
   if(boat_contains((next_x + cursor_x), (next_y + cursor_y))){
     ret = true;
@@ -196,7 +194,7 @@ void losing_animation() {
 }
 
 void waiting_animation(){
-   while (true){
+  while (true){
     for (int i = MATRIX_HEIGHT-1; i >= 0; i--){
       for (int j = 0; j < MATRIX_WIDTH; j++){
         matrix.drawPixel(j, i, matrix.Color(0, 240, 150));
@@ -235,7 +233,6 @@ void waiting() {
   }
 
   my_role = battle_register();
-  Serial.println("Button pressed!");
   current_state = SETUP;
 }
 
@@ -255,7 +252,6 @@ void setup_state() {
   while ((longest = longest_boat(availableBoats)) > 0) {
     set_starting_cursor_position(cursor_x, cursor_y);  
   
-    Serial.println("longest : " + String(longest));
     while (digitalRead(JOYSTICK_BUTTON)) {
       int x = readJoystickAxis(JOYSTICK_Y);
       int y = readJoystickAxis(JOYSTICK_X);
@@ -403,7 +399,7 @@ void setup_state() {
   matrix.clear();
   matrix.show();
   
- waiting_animation();
+  waiting_animation();
 
   current_state = PLAYING;
 
@@ -505,9 +501,8 @@ void playing_state(){
     matrix.show();    
     delay(1000);      
 
-    
-
   }else{
+    
     matrix.clear();
     for (int i = 0; i < MATRIX_HEIGHT; i++){
       for(int j = 0; j < MATRIX_WIDTH; j++){
