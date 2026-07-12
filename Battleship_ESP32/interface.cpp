@@ -16,11 +16,6 @@
 #define MATRIX_HEIGHT 8
 #define MATRIX_PIN 12
 
-int cursor_x = 0;
-int cursor_y = 0;
-
-
-
 Adafruit_NeoMatrix matrix = Adafruit_NeoMatrix(
   MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_PIN,
   NEO_MATRIX_TOP + NEO_MATRIX_RIGHT + NEO_MATRIX_COLUMNS + NEO_MATRIX_ZIGZAG,
@@ -33,30 +28,13 @@ enum State {
   RESULT,
 };
 
-// Direction and Boat come from protocol.h (via battle.h) — same names and
-// layout as before, so the code below is unchanged.
-
 State current_state;
 std::vector<Boat> setup_boat;
 Role my_role;
 
-void interface_setup() {
+int cursor_x = 0;
+int cursor_y = 0;
 
-
-  Serial.begin(115200);
-  pinMode(JOYSTICK_BUTTON, INPUT_PULLUP);
-  pinMode(JOYSTICK_X, INPUT);
-  pinMode(JOYSTICK_Y, INPUT);
-  // pinMode(LED_BUILTIN, OUTPUT);
-  //pinMode(MATRIX_PIN, OUTPUT);
-
-
-
-  matrix.begin();
-  matrix.setBrightness(10);
-  battle_begin();
-  current_state = WAITING;
-}
 
 int readJoystickAxis(uint8_t pin) {
   int raw_value = analogRead(pin);
@@ -70,30 +48,19 @@ int readJoystickAxis(uint8_t pin) {
   }
 }
 
-void waiting() {
-  matrix.clear();
+void set_starting_cursor_position(int &cursor_x, int &cursor_y) {
+  for (int i = 0; i < 8; i++) {
+    for (int j = 0; j <= i; j++) {
+      cursor_x = j;
+      cursor_y = i - j;
 
+      Serial.println("Cursor is " + String(cursor_x) + ", " + String(cursor_y));
 
-  int boats[] = { 2, 2, 3, 4 };
-  uint16_t colors[] = { matrix.Color(0, 240, 150), matrix.Color(0, 0, 240), matrix.Color(250, 24, 150), matrix.Color(250, 200, 0) };
-  for (int i = 0; i < 4; i++) {
-    int boat = boats[i];
-    for (int j = 0; j < boat; j++) {
-      matrix.drawPixel(i + 2, j + 2, colors[i]);
+      if (!boat_contains(cursor_x, cursor_y))
+        return;
     }
   }
-
-  matrix.show();
-
-  while (digitalRead(JOYSTICK_BUTTON)) {
-    delay(100);
-  }
-
-  my_role = battle_register();
-  Serial.println("Button pressed!");
-  current_state = SETUP;
 }
-
 
 int longest_boat(std::map<int, int> availableBoats) {
   for (auto it = availableBoats.rbegin(); it != availableBoats.rend(); ++it) {
@@ -144,7 +111,139 @@ bool illegal(int next_x, int next_y, int longest) {
   return ret;
 }
 
+
+void winning_animation() {
+  while(true){
+    long start_millis = millis();
+    matrix.clear();
+    matrix.drawPixel( 2, 1, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 3, 1, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 4, 1, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 5, 1, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 1, 2, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 6, 2, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 2, 5, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 2, 6, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 5, 5, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 5, 6, matrix.Color(255, 255, 0));
+
+    matrix.show();
+    while (millis() < start_millis + 1000) {
+      delay(50);
+      if(!digitalRead(JOYSTICK_BUTTON)){
+        return;
+      }
+    }
+    matrix.clear();
+    matrix.drawPixel( 1, 2, matrix.Color(0, 255, 0));
+    matrix.drawPixel( 2, 1, matrix.Color(0, 255, 0));
+    matrix.drawPixel( 3, 2, matrix.Color(0, 255, 0));
+    matrix.drawPixel( 4, 3, matrix.Color(0, 255, 0));
+    matrix.drawPixel( 5, 4, matrix.Color(0, 255, 0));
+    matrix.drawPixel( 6, 5, matrix.Color(0, 255, 0));
+    matrix.show();
+    while (millis() < start_millis + 2000) {
+      delay(50);
+      if(!digitalRead(JOYSTICK_BUTTON)){
+        return;
+      }
+    }
+  }
+}
+
+void losing_animation() {
+  while(true){
+    long start_millis = millis();
+    matrix.clear();
+    matrix.drawPixel( 1, 1, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 6, 1, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 2, 2, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 3, 2, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 4, 2, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 5, 2, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 2, 5, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 2, 6, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 5, 5, matrix.Color(255, 255, 0));
+    matrix.drawPixel( 5, 6, matrix.Color(255, 255, 0));
+    matrix.show();
+    while (millis() < start_millis + 1000) {
+      delay(50);
+      if(!digitalRead(JOYSTICK_BUTTON)){
+        return;
+      }
+    }
+    matrix.clear();
+    matrix.drawPixel( 1, 1, matrix.Color(255, 0, 0));
+    matrix.drawPixel( 6, 1, matrix.Color(255, 0, 0));
+    matrix.drawPixel( 2, 2, matrix.Color(255, 0, 0));
+    matrix.drawPixel( 5, 2, matrix.Color(255, 0, 0));
+    matrix.drawPixel( 3, 3, matrix.Color(255, 0, 0));
+    matrix.drawPixel( 4, 3, matrix.Color(255, 0, 0));
+    matrix.drawPixel( 3, 4, matrix.Color(255, 0, 0));
+    matrix.drawPixel( 4, 4, matrix.Color(255, 0, 0));
+    matrix.drawPixel( 2, 5, matrix.Color(255, 0, 0));
+    matrix.drawPixel( 5, 5, matrix.Color(255, 0, 0));
+    matrix.drawPixel( 1, 6, matrix.Color(255, 0, 0));
+    matrix.drawPixel( 6, 6, matrix.Color(255, 0, 0));
+    matrix.show();
+    while (millis() < start_millis + 2000) {
+      delay(50);
+      if(!digitalRead(JOYSTICK_BUTTON)){
+        return;
+      }
+    }
+  }
+}
+
+void waiting_animation(){
+   while (true){
+    for (int i = MATRIX_HEIGHT-1; i >= 0; i--){
+      for (int j = 0; j < MATRIX_WIDTH; j++){
+        matrix.drawPixel(j, i, matrix.Color(0, 240, 150));
+        matrix.show();
+        delay(100);
+        matrix.drawPixel(j, i, matrix.Color(0, 0, 0));
+        matrix.show();
+
+        if(!battle_game_started()){
+          return;
+        }
+      }
+
+    }
+
+  }
+}
+
+void waiting() {
+  matrix.clear();
+
+
+  int boats[] = { 2, 2, 3, 4 };
+  uint16_t colors[] = { matrix.Color(0, 240, 150), matrix.Color(0, 0, 240), matrix.Color(250, 24, 150), matrix.Color(250, 200, 0) };
+  for (int i = 0; i < 4; i++) {
+    int boat = boats[i];
+    for (int j = 0; j < boat; j++) {
+      matrix.drawPixel(i + 2, j + 2, colors[i]);
+    }
+  }
+
+  matrix.show();
+
+  while (digitalRead(JOYSTICK_BUTTON)) {
+    delay(100);
+  }
+
+  my_role = battle_register();
+  Serial.println("Button pressed!");
+  current_state = SETUP;
+}
+
+
+
 void setup_state() {
+
+  setup_boat.clear();
   std::map<int, int> availableBoats;
   availableBoats[2] = 2;
   availableBoats[3] = 1;
@@ -154,8 +253,8 @@ void setup_state() {
   int longest;
 
   while ((longest = longest_boat(availableBoats)) > 0) {
-    cursor_x = 0;
-    cursor_y = 0;
+    set_starting_cursor_position(cursor_x, cursor_y);  
+  
     Serial.println("longest : " + String(longest));
     while (digitalRead(JOYSTICK_BUTTON)) {
       int x = readJoystickAxis(JOYSTICK_Y);
@@ -172,7 +271,7 @@ void setup_state() {
         
         cursor_x = next_cursor_x;
         cursor_y = next_cursor_y;
-        matrix.drawPixel(cursor_x, cursor_y, matrix.Color(0,0,255));
+        matrix.drawPixel(cursor_x, cursor_y, matrix.Color(255,255,255));
       }
 
       matrix.show();
@@ -204,7 +303,7 @@ void setup_state() {
       }
 
       if (next_offset_x * x + next_offset_y * y > 0) {
-        matrix.drawPixel(cursor_x + next_offset_x, cursor_y + next_offset_y, matrix.Color(0, 0, 255));
+        matrix.drawPixel(cursor_x + next_offset_x, cursor_y + next_offset_y, matrix.Color(255, 255, 255));
       } else {
         matrix.drawPixel(cursor_x + offset_x, cursor_y + offset_y, matrix.Color(0, 0, 0));
       }
@@ -244,11 +343,23 @@ void setup_state() {
       switch(dir){
         case NORTH:
           for(int i = cursor_y; i < (cursor_y+length); i++){
+            matrix.drawPixel(cursor_x, i, matrix.Color(255, 0, 0));
+          }
+          matrix.show();
+          delay(250);
+
+          for(int i = cursor_y; i < (cursor_y+length); i++){
             matrix.drawPixel(cursor_x, i, matrix.Color(0, 0, 0));
           }
           break;
         
         case SOUTH:
+          for(int i = cursor_y; i > (cursor_y-length); i--){
+            matrix.drawPixel(cursor_x, i, matrix.Color(255, 0, 0));
+          }
+          matrix.show();
+          delay(250);
+
           for(int i = cursor_y; i > (cursor_y-length); i--){
             matrix.drawPixel(cursor_x, i, matrix.Color(0, 0, 0));
           }
@@ -256,11 +367,23 @@ void setup_state() {
 
         case WEST:
           for(int i = cursor_x; i > (cursor_x-length); i--){
+            matrix.drawPixel(i, cursor_y, matrix.Color(255, 0, 0));
+          }
+          matrix.show();
+          delay(250);
+
+          for(int i = cursor_x; i > (cursor_x-length); i--){
             matrix.drawPixel(i, cursor_y, matrix.Color(0, 0, 0));
           }
           break;
 
         case EAST:
+         for(int i = cursor_x; i < (cursor_x+length); i++){
+            matrix.drawPixel(i, cursor_y, matrix.Color(255, 0, 0));
+          }
+          matrix.show();
+          delay(250);
+
           for(int i = cursor_x; i < (cursor_x+length); i++){
             matrix.drawPixel(i, cursor_y, matrix.Color(0, 0, 0));
           }
@@ -271,9 +394,7 @@ void setup_state() {
       
       continue;
     }
-    Serial.println("La inserisce?");
     setup_boat.push_back({ length, dir, { cursor_x, cursor_y } });
-    Serial.println("Yesssss");
     
   }
 
@@ -282,27 +403,7 @@ void setup_state() {
   matrix.clear();
   matrix.show();
   
-  int timer = 0;
-  
-  while (!battle_game_started() || timer<2 ){
-    Serial.println("Entra nel while colore");
-    
-    for (int i = MATRIX_HEIGHT-1; i >= 0; i--){
-      for (int j = 0; j < MATRIX_WIDTH; j++){
-        matrix.drawPixel(j, i, matrix.Color(0, 255, 0));
-        matrix.show();
-        delay(100);
-        matrix.drawPixel(j, i, matrix.Color(0, 0, 0));
-        matrix.show();
-      }
-
-    }
-
-
-    timer += 1;
-
-  }
- 
+ waiting_animation();
 
   current_state = PLAYING;
 
@@ -322,7 +423,7 @@ void playing_state(){
             break;
 
           case EnemyCell::Hit:
-            matrix.drawPixel(j, i, matrix.Color(255, 128, 0));
+            matrix.drawPixel(j, i, matrix.Color(255, 255, 0));
             break;
 
           case EnemyCell::Miss:
@@ -337,6 +438,7 @@ void playing_state(){
 
     }
     
+    matrix.drawPixel(0, 0, matrix.Color(255,255,255));
 
     matrix.show();
 
@@ -365,7 +467,7 @@ void playing_state(){
             break;
 
           case EnemyCell::Hit:
-            matrix.drawPixel(previous_x, previous_y, matrix.Color(255, 128, 0));
+            matrix.drawPixel(previous_x, previous_y, matrix.Color(255, 255, 0));
             break;
 
           case EnemyCell::Miss:
@@ -388,7 +490,7 @@ void playing_state(){
     switch(battle_shoot(cursor_x, cursor_y)){
 
       case HitResult::Hit:
-        matrix.drawPixel(cursor_x, cursor_y, matrix.Color(255, 128, 0));
+        matrix.drawPixel(cursor_x, cursor_y, matrix.Color(255, 255, 0));
         break;
 
       case HitResult::Water:
@@ -415,7 +517,7 @@ void playing_state(){
             break;
 
           case OwnCell::Hit:
-            matrix.drawPixel(j, i, matrix.Color(255, 128, 0));
+            matrix.drawPixel(j, i, matrix.Color(255, 255, 0));
             break;
 
           case OwnCell::Miss:
@@ -434,30 +536,48 @@ void playing_state(){
 
     }
 
-    
-
-    
-    
-
     matrix.show();
     uint8_t opponent_x;
     uint8_t opponent_y;
     HitResult hit = battle_wait_for_opponent_shot(opponent_x, opponent_y);
 
+    
+
     switch(hit){
       case HitResult::Hit:
-        matrix.drawPixel(opponent_x, opponent_y, matrix.Color(255, 128, 0));
+        for (int i = 0; i < 3; i++){
+          matrix.drawPixel(opponent_x, opponent_y, matrix.Color(0, 0, 0));
+          matrix.show();
+          delay(100);
+          matrix.drawPixel(opponent_x, opponent_y, matrix.Color(255, 255, 0));
+          matrix.show();
+          delay(100);
+        }
+        
         break;
 
       case HitResult::Water:
-        matrix.drawPixel(opponent_x, opponent_y, matrix.Color(0, 0, 255));
+        for (int i = 0; i < 3; i++){
+          matrix.drawPixel(opponent_x, opponent_y, matrix.Color(0, 0, 0));
+          matrix.show();
+          delay(100);
+          matrix.drawPixel(opponent_x, opponent_y, matrix.Color(0, 0, 255));
+          matrix.show();
+          delay(100);
+        }
         break;
 
       case HitResult::Sunk:
-        matrix.drawPixel(opponent_x, opponent_y, matrix.Color(255, 0, 0));
+        for (int i = 0; i < 3; i++){
+          matrix.drawPixel(opponent_x, opponent_y, matrix.Color(0, 0, 0));
+          matrix.show();
+          delay(100);
+          matrix.drawPixel(opponent_x, opponent_y, matrix.Color(255, 0, 0));
+          matrix.show();
+          delay(100);
+        }
         break;
     }
-    matrix.show();
     delay(1000);
     battle_await_change();
 
@@ -469,20 +589,30 @@ void playing_state(){
   
 }
 
+
+
 void result_state(){
-
   if(my_role == battle_winner()){
-
+    winning_animation();
   }else{
-
+    losing_animation();
   }
-
-
   current_state = WAITING;
 }
 
+void interface_setup() {
 
-// the loop function runs over and over again forever
+  Serial.begin(115200);
+  pinMode(JOYSTICK_BUTTON, INPUT_PULLUP);
+  pinMode(JOYSTICK_X, INPUT);
+  pinMode(JOYSTICK_Y, INPUT);
+
+  matrix.begin();
+  matrix.setBrightness(10);
+  battle_begin();
+  current_state = WAITING;
+}
+
 void interface_loop() {
   switch (current_state) {
     case WAITING:
