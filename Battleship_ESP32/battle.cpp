@@ -132,6 +132,18 @@ void battle_begin() {
 }
 
 Role battle_register() {
+  // New game: wipe everything left over from the previous one, both the boards
+  // (ships + shots in g_state) and the facade flags.
+  game_state_reset();
+  s_over           = false;
+  s_started        = false;
+  s_my_turn        = false;
+  s_winner         = Role::None;
+  s_shot_wait      = false;
+  s_shot_ready     = false;
+  s_opp_shot_ready = false;
+  s_state_ready    = false;
+
   s_assigned = false;
   s_phase = AppPhase::Registering;
   net_mqtt_publish_register(net_wifi_mac());
