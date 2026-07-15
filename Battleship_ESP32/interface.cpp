@@ -48,17 +48,7 @@ int readJoystickAxis(uint8_t pin) {
   }
 }
 
-void set_starting_cursor_position(int &cursor_x, int &cursor_y) {
-  for (int i = 0; i < 8; i++) {
-    for (int j = 0; j <= i; j++) {
-      cursor_x = j;
-      cursor_y = i - j;
 
-      if (!boat_contains(cursor_x, cursor_y))
-        return;
-    }
-  }
-}
 
 int longest_boat(std::map<int, int> availableBoats) {
   for (auto it = availableBoats.rbegin(); it != availableBoats.rend(); ++it) {
@@ -81,6 +71,18 @@ bool boat_contains(int next_x, int next_y){
     }
   }
   return false;
+}
+
+void set_starting_cursor_position(int &cursor_x, int &cursor_y) {
+  for (int i = 0; i < 8; i++) {
+    for (int j = 0; j <= i; j++) {
+      cursor_x = j;
+      cursor_y = i - j;
+
+      if (!boat_contains(cursor_x, cursor_y))
+        return;
+    }
+  }
 }
 
 bool illegal(int next_x, int next_y, int longest) {
@@ -203,7 +205,7 @@ void waiting_animation(){
         matrix.drawPixel(j, i, matrix.Color(0, 0, 0));
         matrix.show();
 
-        if(!battle_game_started()){
+        if(battle_game_started()){
           return;
         }
       }
@@ -502,7 +504,7 @@ void playing_state(){
     delay(1000);      
 
   }else{
-    
+
     matrix.clear();
     for (int i = 0; i < MATRIX_HEIGHT; i++){
       for(int j = 0; j < MATRIX_WIDTH; j++){
